@@ -1,5 +1,2 @@
 FlightLxx.egg-info
 .vscode
-rl/train
-!rl/train/run_drone_control.py
-!rl/train/view_reward.py

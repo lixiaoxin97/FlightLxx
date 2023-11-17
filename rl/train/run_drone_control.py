@@ -38,7 +38,7 @@ def parser():
                         help="Directory where to save the checkpoints and training metrics")
     parser.add_argument('--seed', type=int, default=0,
                         help="Random seed")
-    parser.add_argument('-w', '--weight', type=str, default='./2023-11-09-16-20-15.zip',
+    parser.add_argument('-w', '--weight', type=str, default='./RatesThrust.zip',
                         help='trained weight path')
     return parser
 
@@ -76,7 +76,7 @@ def main():
             lam=0.95,
             gamma=0.99,  # lower 0.9 ~ 0.99
             # n_steps=math.floor(cfg['env']['max_time'] / cfg['env']['ctl_dt']),
-            n_steps=250,
+            n_steps=500,
             ent_coef=0.00,
             learning_rate=3e-4,
             vf_coef=0.5,
@@ -98,7 +98,7 @@ def main():
         # 2000000000 is 4000 iterations.
         logger.configure(folder=saver.data_dir)
         model.learn(
-            total_timesteps=int(25000000),
+            total_timesteps=int(250000000),
             log_dir=saver.data_dir, logger=logger)
         model.save(saver.data_dir)
 

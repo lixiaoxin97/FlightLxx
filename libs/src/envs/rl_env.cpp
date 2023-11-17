@@ -38,10 +38,10 @@ QuadrotorEnv::QuadrotorEnv(const std::string &cfg_path)
   Scalar mass = quadrotor_ptr_->getMass();
   // act_mean_ = Vector<quadenv::kNAct>::Ones() * (-mass * Gz) / 4;
   // act_std_ = Vector<quadenv::kNAct>::Ones() * (-mass * 2 * Gz) / 4;
-  act_mean_ = Vector<quadenv::kNAct>::Ones() * (-mass * Gz) ;
+  act_mean_ = Vector<quadenv::kNAct>::Ones() * (-Gz) ;
   act_mean_.segment<3>(0).setZero();
   act_std_ = Vector<quadenv::kNAct>::Ones() * 2 * 3.1415926;
-  act_std_(3) = (-mass * Gz) / 2;
+  act_std_(3) = (-Gz*3);
 
   // load parameters
   loadParam(cfg_);
@@ -101,9 +101,6 @@ bool QuadrotorEnv::getObs(Ref<Vector<>> obs) {
 Scalar QuadrotorEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
 //  quad_act_ = act.cwiseProduct(act_std_) + act_mean_;
   quad_act_ = act.cwiseProduct(act_std_) + act_mean_;
-// 控制推力的幅值，重力平衡
-// 要系统改
-// 必须得改，网络的初始参数得让无人机悬停
   cmd_.t += sim_dt_;
   //cmd_.thrusts = quad_act_;
   cmd_.omega = quad_act_.segment<3>(0);
