@@ -92,7 +92,7 @@ Vector<4> QuadrotorDynamics::clampThrust(const Vector<4> thrusts) const {
 }
 
 Scalar QuadrotorDynamics::clampThrust(const Scalar thrust) const {
-  return std::clamp(thrust, thrust_min_, thrust_max_);
+  return std::clamp(thrust, collective_thrust_min(), collective_thrust_max());
 }
 
 Vector<4> QuadrotorDynamics::clampMotorOmega(const Vector<4>& omega) const {

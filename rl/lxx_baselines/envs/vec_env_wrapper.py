@@ -26,7 +26,7 @@ class FlightEnvVec(VecEnv):
                                     len(self._extraInfoNames)], dtype=np.float32)
         self.rewards = [[] for _ in range(self.num_envs)]
 
-        self.max_episode_steps = 300
+        self.max_episode_steps = 1000
 
     def seed(self, seed=0):
         self.wrapper.setSeed(seed)
