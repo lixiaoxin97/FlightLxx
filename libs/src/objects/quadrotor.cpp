@@ -69,18 +69,6 @@ bool Quadrotor::run(const Scalar ctl_dt) {
     //
     state_.x = next_state.x;
     remain_ctl_dt -= sim_dt;
-
-
-    // const Scalar sim_dt = std::min(remain_ctl_dt, max_dt);
-    // const Vector<3> force(0.0, 0.0, cmd_.collective_thrust);
-    // state_.a = state_.q() * force + gz_;
-    // state_.w = cmd_.omega;
-    // integrator_ptr_->step(state_.x, sim_dt, next_state.x);
-    // state_.qx /= state_.qx.norm();
-    // state_.x = next_state.x;
-    // remain_ctl_dt -= sim_dt;
-
-
   }
   state_.t += ctl_dt;
   //
