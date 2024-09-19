@@ -62,9 +62,9 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
     if (quad_state_.x(QS::POSZ) < -0.0)
       quad_state_.x(QS::POSZ) = -quad_state_.x(QS::POSZ);
     // reset linear velocity
-    quad_state_.x(QS::VELX) = 0;
-    quad_state_.x(QS::VELY) = 0;
-    quad_state_.x(QS::VELZ) = 0;
+    quad_state_.x(QS::VELX) = uniform_dist_(random_gen_)*0.5;
+    quad_state_.x(QS::VELY) = uniform_dist_(random_gen_)*0.5;
+    quad_state_.x(QS::VELZ) = uniform_dist_(random_gen_)*0.5;
     // reset orientation
     quad_state_.x(QS::ATTW) = uniform_dist_(random_gen_);
     quad_state_.x(QS::ATTX) = uniform_dist_(random_gen_);
@@ -149,8 +149,8 @@ Scalar QuadrotorEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
 }
 
 bool QuadrotorEnv::isTerminalState(Scalar &reward) {
-  if (quad_state_.x(QS::POSZ) <= 4.0) {
-    reward = -0.02;
+  if (quad_state_.x(QS::POSZ) <= 0.0) {
+    reward = -10;
     return true;
   }
   reward = 0.0;
