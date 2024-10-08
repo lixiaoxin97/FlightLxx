@@ -128,7 +128,7 @@ class CMakeBuild(build_ext):
 # logic and declaration, and simpler if you include description/version in a file.
 setup(
     name="FlightLxx",
-    version="",
+    version="3.0.0",
     author="lixiaoxin97",
     author_email="lixiaoxin97@foxmail.com",
     description="FlightLxx: A Quadrotor Simulator for Reinforcement Learning",
@@ -139,6 +139,6 @@ setup(
     extras_require={"test": ["pytest>=6.0"]},
     python_requires=">=3.6",
     install_requires=['gym==0.11', 'ruamel.yaml==0.16.10',
-                      'numpy', 'stable_baselines==2.10.1'],
+                      'numpy==1.22.0', 'stable_baselines==2.10.1'],
     packages=['rl.lxx_baselines.ppo', 'rl.lxx_baselines.common', 'rl.lxx_baselines.envs']
 )
