@@ -40,7 +40,8 @@ QuadrotorEnv::QuadrotorEnv(const std::string &cfg_path)
   // act_std_ = Vector<quadenv::kNAct>::Ones() * (-mass * 2 * Gz) / 4;
   act_mean_ = Vector<quadenv::kNAct>::Ones() * (-Gz) ;
   act_mean_.segment<3>(0).setZero();
-  act_std_ = Vector<quadenv::kNAct>::Ones() * 1 * 3.1415926;
+  act_std_ = Vector<quadenv::kNAct>::Ones() * 2 * 3.1415926;
+  act_std_(2) = 3.1415926;
   act_std_(3) = (-Gz*1);
 
   // load parameters
