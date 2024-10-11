@@ -84,9 +84,9 @@ def test_model(env, model, render=False):
         ax_euler_vz.step(t, deuler[:, 2], color="C{0}".format(
             n_roll), label=r"$\theta$ [x, y, z] -- trail: {0}".format(n_roll))
         #
-        ax_action0.step(t, actions[:, 0] * 1 * 3.1415926, color="C{0}".format(
+        ax_action0.step(t, actions[:, 0] * 2 * 3.1415926, color="C{0}".format(
             n_roll), label="trail: {0}".format(n_roll))
-        ax_action1.step(t, actions[:, 1] * 1 * 3.1415926, color="C{0}".format(
+        ax_action1.step(t, actions[:, 1] * 2 * 3.1415926, color="C{0}".format(
             n_roll), label="trail: {0}".format(n_roll))
         ax_action2.step(t, actions[:, 2] * 1 * 3.1415926, color="C{0}".format(
             n_roll), label="trail: {0}".format(n_roll))
