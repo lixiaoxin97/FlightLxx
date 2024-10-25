@@ -37,8 +37,8 @@ class QuadrotorDynamics : DynamicsBase {
   Vector<4> clampMotorOmega(const Vector<4>& omega) const;
   Vector<3> clampBodyrates(const Vector<3>& omega) const;
 
-  inline Scalar collective_thrust_min() const { return 4.0 * thrust_min_; }
-  inline Scalar collective_thrust_max() const { return 4.0 * thrust_max_; }
+  inline Scalar collective_thrust_min() const { return 4.0 * thrust_min_ / mass_; }
+  inline Scalar collective_thrust_max() const { return 4.0 * thrust_max_ / mass_; }
 
   // Helpers for conversion
   Vector<4> motorOmegaToThrust(const Vector<4>& omega) const;
