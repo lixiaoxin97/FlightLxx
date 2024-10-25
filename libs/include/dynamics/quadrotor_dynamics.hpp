@@ -28,6 +28,7 @@ class QuadrotorDynamics : DynamicsBase {
   // help functions
   bool valid() const;
   bool updateParams(const YAML::Node& params);
+  bool showQuadrotorDynamicsParams();
 
   // Helpers to apply limits.
   Vector<4> clampThrust(const Vector<4> thrusts) const;
