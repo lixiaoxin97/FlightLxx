@@ -192,7 +192,7 @@ bool QuadrotorDynamics::updateInertiaMarix() {
   if (!valid()) return false;
   t_BM_ = arm_l_ * sqrt(0.5) *
           (Matrix<3, 4>() << 1, -1, -1, 1, -1, -1, 1, 1, 0, 0, 0, 0).finished();
-  J_ = mass_ / 12.0 * arm_l_ * arm_l_ * Vector<3>(4.5, 4.5, 7).asDiagonal();
+  J_ = mass_ / 24.0 * arm_l_ * arm_l_ * Vector<3>(4.5, 4.5, 7).asDiagonal();
   J_inv_ = J_.inverse();
   return true;
 }
