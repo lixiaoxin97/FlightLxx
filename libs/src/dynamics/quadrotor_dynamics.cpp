@@ -179,8 +179,6 @@ bool QuadrotorDynamics::updateParams(const YAML::Node& params) {
     omega_max_ = Map<Vector<3>>(omega_max.data());
 
     // update relevant variables
-    thrust_min_ = 0.0;
-    thrust_max_ = motor_omega_max_ * motor_omega_max_ * thrust_map_(0) + motor_omega_max_ * thrust_map_(1) + thrust_map_(2);
     updateInertiaMarix();
     return valid();
   } else {
@@ -192,26 +190,8 @@ bool QuadrotorDynamics::updateInertiaMarix() {
   if (!valid()) return false;
   t_BM_ = arm_l_ * sqrt(0.5) *
           (Matrix<3, 4>() << 1, -1, -1, 1, -1, -1, 1, 1, 0, 0, 0, 0).finished();
-  J_ = mass_ / 24.0 * arm_l_ * arm_l_ * Vector<3>(4.5, 4.5, 7).asDiagonal();
+  J_ = mass_ / 12.0 * arm_l_ * arm_l_ * Vector<3>(4.5, 4.5, 7).asDiagonal();
   J_inv_ = J_.inverse();
-  return true;
-}
-
-bool QuadrotorDynamics::showQuadrotorDynamicsParams() {
-  std::cout<< "Quadrotor Dynamics Parameters:\n";
-  std::cout<< "mass =             [" << mass_ << "]\n";
-  std::cout<< "arm_l =            [" << arm_l_ << "]\n";
-  std::cout<< "motor_omega_min =  [" << motor_omega_min_ << "]\n";
-  std::cout<< "motor_omega_max =  [" << motor_omega_max_ << "]\n";
-  std::cout<< "motor_tau_inv =    [" << motor_tau_inv_ << "]\n";
-  std::cout<< "thrust_map =       [" << thrust_map_.transpose() << "]\n";
-  std::cout<< "kappa =            [" << kappa_ << "]\n";
-  std::cout<< "omega_max =        [" << omega_max_.transpose() << "]\n";
-  std::cout<< "thrust_min =       [" << thrust_min_ << "]\n";
-  std::cout<< "thrust_max =       [" << thrust_max_ << "]\n";
-  std::cout<< "inertia =          [" << J_.row(0) << "]\n";
-  std::cout<< "                   [" << J_.row(1) << "]\n";
-  std::cout<< "                   [" << J_.row(2) << "]\n";
   return true;
 }
 

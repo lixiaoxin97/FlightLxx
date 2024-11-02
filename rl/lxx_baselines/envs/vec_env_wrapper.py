@@ -9,6 +9,7 @@ class FlightEnvVec(VecEnv):
         self.wrapper = impl
         self.num_obs = self.wrapper.getObsDim()
         self.num_acts = self.wrapper.getActDim()
+        print(self.num_obs, self.num_acts)
         self._observation_space = spaces.Box(
             np.ones(self.num_obs) * -np.Inf,
             np.ones(self.num_obs) * np.Inf, dtype=np.float32)
