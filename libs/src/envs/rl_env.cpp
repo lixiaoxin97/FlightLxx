@@ -23,6 +23,7 @@ QuadrotorEnv::QuadrotorEnv(const std::string &cfg_path)
   // update dynamics
   QuadrotorDynamics dynamics;
   dynamics.updateParams(cfg_);
+  dynamics.showQuadrotorDynamicsParams();
   quadrotor_ptr_->updateDynamics(dynamics);
 
   // define a bounding box
