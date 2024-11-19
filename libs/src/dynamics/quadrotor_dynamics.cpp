@@ -10,15 +10,14 @@ QuadrotorDynamics::QuadrotorDynamics(const Scalar mass, const Scalar arm_l)
       (Matrix<3, 4>() << 1, -1, -1, 1, -1, -1, 1, 1, 0, 0, 0, 0).finished()),
     J_(mass / 12.0 * arm_l * arm_l * Vector<3>(4.5, 4.5, 7).asDiagonal()),
     J_inv_(J_.inverse()),
-    motor_omega_min_(150.0),
+    motor_omega_min_(-2000.0),
     motor_omega_max_(2000.0),
     motor_tau_inv_(1.0 / 0.05),
-    thrust_map_(1.3298253500372892e-06, 0.0038360810526746033,
-                -1.7689986848125325),
+    thrust_map_p_( 1.4e-06, 0.0, 0.0),
+    thrust_map_n_(-0.7e-06, 0.0, 0.0),
     kappa_(0.016),
-    thrust_min_(0.0),
-    thrust_max_(motor_omega_max_ * motor_omega_max_ * thrust_map_(0) +
-                motor_omega_max_ * thrust_map_(1) + thrust_map_(2)),
+    thrust_min_(motor_omega_min_ * motor_omega_min_ * thrust_map_n_(0) + motor_omega_min_ * thrust_map_n_(1) + thrust_map_n_(2)),
+    thrust_max_(motor_omega_max_ * motor_omega_max_ * thrust_map_p_(0) + motor_omega_max_ * thrust_map_p_(1) + thrust_map_p_(2)),
     omega_max_(Vector<3>::Constant(6.0)) {}
 
 QuadrotorDynamics::~QuadrotorDynamics() {}
@@ -73,13 +72,14 @@ bool QuadrotorDynamics::valid() const {
   check &= J_.allFinite();
   check &= J_inv_.allFinite();
 
-  check &= motor_omega_min_ >= 0.0;
+  check &= motor_omega_min_ <= 0.0;
   check &= (motor_omega_max_ > motor_omega_min_);
   check &= motor_tau_inv_ > 0.0;
 
-  check &= thrust_map_.allFinite();
+  check &= thrust_map_p_.allFinite();
+  check &= thrust_map_n_.allFinite();
   check &= kappa_ > 0.0;
-  check &= thrust_min_ >= 0.0;
+  check &= thrust_min_ <= 0.0;
   check &= (thrust_max_ > thrust_min_);
 
   check &= (omega_max_.array() > 0).all();
@@ -104,23 +104,59 @@ Vector<3> QuadrotorDynamics::clampBodyrates(const Vector<3>& omega) const {
 }
 
 Vector<4> QuadrotorDynamics::motorOmegaToThrust(const Vector<4>& omega) const {
-  const Matrix<4, 3> omega_poly =
-    (Matrix<4, 3>() << omega.cwiseProduct(omega), omega, Vector<4>::Ones())
-      .finished();
-  return omega_poly * thrust_map_;
+  // const Matrix<4, 3> omega_poly =
+  //   (Matrix<4, 3>() << omega.cwiseProduct(omega), omega, Vector<4>::Ones())
+  //     .finished();
+  // return omega_poly * thrust_map_;
+
+  Vector<4> motor_thrust;
+  for(int i=0; i<4; i++)
+  {
+    if (omega[i] > 0)
+    {
+      motor_thrust[i] = thrust_map_p_[0] * omega[i] * omega[i];
+    }
+    else if (omega[i] < 0)
+    {
+      motor_thrust[i] = thrust_map_n_[0] * omega[i] * omega[i];
+    }
+    else
+    {
+      motor_thrust[i] = 0.0;
+    }
+  }
+  return motor_thrust;
 }
 
 Vector<4> QuadrotorDynamics::motorThrustToOmega(
   const Vector<4>& thrusts) const {
-  const Scalar scale = 1.0 / (2.0 * thrust_map_[0]);
-  const Scalar offset = -thrust_map_[1] * scale;
+  // const Scalar scale = 1.0 / (2.0 * thrust_map_[0]);
+  // const Scalar offset = -thrust_map_[1] * scale;
 
-  const Array<4, 1> root =
-    (std::pow(thrust_map_[1], 2) -
-     4.0 * thrust_map_[0] * (thrust_map_[2] - thrusts.array()))
-      .sqrt();
+  // const Array<4, 1> root =
+  //   (std::pow(thrust_map_[1], 2) -
+  //    4.0 * thrust_map_[0] * (thrust_map_[2] - thrusts.array()))
+  //     .sqrt();
 
-  return offset + scale * root;
+  // return offset + scale * root;
+
+  Vector<4> motor_omega;
+  for(int i=0; i<4; i++)
+  {
+    if (thrusts[i] > 0)
+    {
+      motor_omega[i] = std::sqrt(thrusts[i] / thrust_map_p_[0]);
+    }
+    else if (thrusts[i] < 0)
+    {
+      motor_omega[i] = std::sqrt(thrusts[i] / thrust_map_n_[0]);
+    }
+    else
+    {
+      motor_omega[i] = 0.0;
+    }
+  }
+  return motor_omega;
 }
 
 Matrix<4, 4> QuadrotorDynamics::getAllocationMatrix() const {
@@ -168,10 +204,14 @@ bool QuadrotorDynamics::updateParams(const YAML::Node& params) {
       params["quadrotor_dynamics"]["motor_omega_max"].as<Scalar>();
     motor_tau_inv_ =
       (1.0 / params["quadrotor_dynamics"]["motor_tau"].as<Scalar>());
-    std::vector<Scalar> thrust_map;
-    thrust_map =
-      params["quadrotor_dynamics"]["thrust_map"].as<std::vector<Scalar>>();
-    thrust_map_ = Map<Vector<3>>(thrust_map.data());
+    std::vector<Scalar> thrust_map_p;
+    thrust_map_p =
+      params["quadrotor_dynamics"]["thrust_map_p"].as<std::vector<Scalar>>();
+    thrust_map_p_ = Map<Vector<3>>(thrust_map_p.data());
+    std::vector<Scalar> thrust_map_n;
+    thrust_map_n =
+      params["quadrotor_dynamics"]["thrust_map_n"].as<std::vector<Scalar>>();
+    thrust_map_n_ = Map<Vector<3>>(thrust_map_n.data());
     kappa_ = params["quadrotor_dynamics"]["kappa"].as<Scalar>();
     std::vector<Scalar> omega_max;
     omega_max =
@@ -179,8 +219,8 @@ bool QuadrotorDynamics::updateParams(const YAML::Node& params) {
     omega_max_ = Map<Vector<3>>(omega_max.data());
 
     // update relevant variables
-    thrust_min_ = 0.0;
-    thrust_max_ = motor_omega_max_ * motor_omega_max_ * thrust_map_(0) + motor_omega_max_ * thrust_map_(1) + thrust_map_(2);
+    thrust_min_ = motor_omega_min_ * motor_omega_min_ * thrust_map_n_(0) + motor_omega_min_ * thrust_map_n_(1) + thrust_map_n_(2);
+    thrust_max_ = motor_omega_max_ * motor_omega_max_ * thrust_map_p_(0) + motor_omega_max_ * thrust_map_p_(1) + thrust_map_p_(2);
     updateInertiaMarix();
     return valid();
   } else {
@@ -204,7 +244,8 @@ bool QuadrotorDynamics::showQuadrotorDynamicsParams() {
   std::cout<< "motor_omega_min =  [" << motor_omega_min_ << "]\n";
   std::cout<< "motor_omega_max =  [" << motor_omega_max_ << "]\n";
   std::cout<< "motor_tau_inv =    [" << motor_tau_inv_ << "]\n";
-  std::cout<< "thrust_map =       [" << thrust_map_.transpose() << "]\n";
+  std::cout<< "thrust_map_p =     [" << thrust_map_p_.transpose() << "]\n";
+  std::cout<< "thrust_map_n =     [" << thrust_map_n_.transpose() << "]\n";
   std::cout<< "kappa =            [" << kappa_ << "]\n";
   std::cout<< "omega_max =        [" << omega_max_.transpose() << "]\n";
   std::cout<< "thrust_min =       [" << thrust_min_ << "]\n";
@@ -229,7 +270,8 @@ std::ostream& operator<<(std::ostream& os, const QuadrotorDynamics& quad) {
      << "motor_omega_min =  [" << quad.motor_omega_min_ << "]\n"
      << "motor_omega_max =  [" << quad.motor_omega_max_ << "]\n"
      << "motor_tau_inv =    [" << quad.motor_tau_inv_ << "]\n"
-     << "thrust_map =       [" << quad.thrust_map_.transpose() << "]\n"
+     << "thrust_map =       [" << quad.thrust_map_p_.transpose() << "]\n"
+     << "thrust_map =       [" << quad.thrust_map_n_.transpose() << "]\n"
      << "kappa =            [" << quad.kappa_ << "]\n"
      << "thrust_min =       [" << quad.thrust_min_ << "]\n"
      << "thrust_max =       [" << quad.thrust_max_ << "]\n"

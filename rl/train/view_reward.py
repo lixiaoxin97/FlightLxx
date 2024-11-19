@@ -18,7 +18,7 @@ def plot_reward(save_dir, varname, ylabel, save_fig=False):
 
 
 if __name__ == "__main__":
-    logger_dir = "./TAE_3_AgileHover/"
+    logger_dir = "./NT_12_NegativeThrust/"
     ppo_var_names = ["ep_reward_mean", "ep_len_mean", "policy_entropy"]
     ppo_y_labels = ["Reward", "Episode Length", "Policy Entropy"]
     #
