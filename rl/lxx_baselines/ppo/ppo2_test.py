@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.gridspec as gridspec
+# import csv
 
 
 def test_model(env, model, render=False):
@@ -31,6 +32,11 @@ def test_model(env, model, render=False):
 
     max_ep_length = env.max_episode_steps
     num_rollouts = 5
+    
+    # with open("trajectory.csv","w") as csvfile:
+    #             writer = csv.writer(csvfile)
+    #             writer.writerow(['','t','px','py','pz','qw','qx','qy','qz','vx','vy','vz','omex','omey','omez','accx','accy','accz','taux','tauy','tauz','jerkx','jerky','jerkz','snapx','snapy','snapz','bomex','bomey','bomez','baccx','baccy','baccz','mot1','mot2','mot3','mot4','motdex1','motdex2','motdex3','motdex4','f1','f2','f3','f4'])
+
     if render:
         env.connectUnity()
     for n_roll in range(num_rollouts):
@@ -38,6 +44,11 @@ def test_model(env, model, render=False):
         actions = []
         obs, done, ep_len = env.reset(), False, 0
         while not (done or (ep_len >= max_ep_length)):
+                                
+            # with open("trajectory.csv","a") as csvfile:
+            #     writer = csv.writer(csvfile)
+            #     writer.writerow([obs[1],obs[2],obs[3],obs[4],obs[5],obs[6],obs[7],obs[8],obs[9],obs[10],obs[11],obs[12],0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
+
             act, _ = model.predict(obs, deterministic=True)
             obs, rew, done, infos = env.step(act)
             #
@@ -83,15 +94,24 @@ def test_model(env, model, render=False):
             n_roll), label="trail :{0}".format(n_roll))
         ax_euler_vz.step(t, deuler[:, 2], color="C{0}".format(
             n_roll), label=r"$\theta$ [x, y, z] -- trail: {0}".format(n_roll))
-        #
-        ax_action0.step(t, actions[:, 0] * 2 * 3.1415926, color="C{0}".format(
+        # NP2G
+        ax_action0.step(t, actions[:, 0] * 0.78 * 9.81 / 2, color="C{0}".format(
             n_roll), label="trail: {0}".format(n_roll))
-        ax_action1.step(t, actions[:, 1] * 2 * 3.1415926, color="C{0}".format(
+        ax_action1.step(t, actions[:, 1] * 0.78 * 9.81 / 2, color="C{0}".format(
             n_roll), label="trail: {0}".format(n_roll))
-        ax_action2.step(t, actions[:, 2] * 1 * 3.1415926, color="C{0}".format(
+        ax_action2.step(t, actions[:, 2] * 0.78 * 9.81 / 2, color="C{0}".format(
             n_roll), label="trail: {0}".format(n_roll))
-        ax_action3.step(t, actions[:, 3] * 2 * 9.81 + 9.81, color="C{0}".format(
+        ax_action3.step(t, actions[:, 3] * 0.78 * 9.81 / 2, color="C{0}".format(
             n_roll), label="act [0, 1, 2, 3] -- trail: {0}".format(n_roll))
+        # P2G
+        # ax_action0.step(t, actions[:, 0] * 0.78 * 9.81 / 4 + 0.78 * 9.81 / 4, color="C{0}".format(
+        #     n_roll), label="trail: {0}".format(n_roll))
+        # ax_action1.step(t, actions[:, 1] * 0.78 * 9.81 / 4 + 0.78 * 9.81 / 4, color="C{0}".format(
+        #     n_roll), label="trail: {0}".format(n_roll))
+        # ax_action2.step(t, actions[:, 2] * 0.78 * 9.81 / 4 + 0.78 * 9.81 / 4, color="C{0}".format(
+        #     n_roll), label="trail: {0}".format(n_roll))
+        # ax_action3.step(t, actions[:, 3] * 0.78 * 9.81 / 4 + 0.78 * 9.81 / 4, color="C{0}".format(
+        #     n_roll), label="act [0, 1, 2, 3] -- trail: {0}".format(n_roll))
     #
     if render:
         env.disconnectUnity()
