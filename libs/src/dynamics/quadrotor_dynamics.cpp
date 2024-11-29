@@ -149,7 +149,7 @@ Vector<4> QuadrotorDynamics::motorThrustToOmega(
     }
     else if (thrusts[i] < 0)
     {
-      motor_omega[i] = std::sqrt(thrusts[i] / thrust_map_n_[0]);
+      motor_omega[i] = -std::sqrt(thrusts[i] / thrust_map_n_[0]);
     }
     else
     {
