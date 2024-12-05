@@ -99,15 +99,15 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
     quad_state_.x(QS::VELY) = 0;
     quad_state_.x(QS::VELZ) = 0;
     // reset orientation
-    quad_state_.x(QS::ATTW) = 1;
-    quad_state_.x(QS::ATTX) = 0;
+    quad_state_.x(QS::ATTW) = 0;
+    quad_state_.x(QS::ATTX) = 1;
     quad_state_.x(QS::ATTY) = 0;
     quad_state_.x(QS::ATTZ) = 0;
     quad_state_.qx /= quad_state_.qx.norm();
     // reset body rate
-    quad_state_.x(QS::OMEX) = 0;
-    quad_state_.x(QS::OMEY) = 0;
-    quad_state_.x(QS::OMEZ) = 0;
+    quad_state_.x(QS::OMEX) = EIGEN_PI;
+    quad_state_.x(QS::OMEY) = EIGEN_PI;
+    quad_state_.x(QS::OMEZ) = EIGEN_PI;
 
   }
   // reset quadrotor with random states
