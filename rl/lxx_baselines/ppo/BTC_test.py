@@ -135,8 +135,8 @@ def btc_test_model(env, model_1, model_2, render=False):
                 writer = csv.writer(csvfile)
                 writer.writerow([ep_len, ep_len*0.02, obs[0, 0],obs[0, 1],obs[0, 2]+5, quaternion[3], quaternion[0], quaternion[1], quaternion[2], obs[0, 6], obs[0, 7],obs[0, 8],obs[0, 9],obs[0, 10],obs[0, 11],0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
 
-            act, _ = model_1.predict(obs, deterministic=True)
-            obs, rew, done, infos = env.step(act)
+            # act, _ = model_1.predict(obs, deterministic=True)
+            # obs, rew, done, infos = env.step(act)
             act1, _ = model_2.predict(obs, deterministic=True)
             act = (act1 + 1)/2
             obs, rew, done, infos = env.step(act)
