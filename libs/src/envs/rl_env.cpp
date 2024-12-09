@@ -105,9 +105,9 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
     quad_state_.x(QS::ATTZ) = 0;
     quad_state_.qx /= quad_state_.qx.norm();
     // reset body rate
-    quad_state_.x(QS::OMEX) = EIGEN_PI;
-    quad_state_.x(QS::OMEY) = EIGEN_PI;
-    quad_state_.x(QS::OMEZ) = EIGEN_PI;
+    quad_state_.x(QS::OMEX) = EIGEN_PI * 3;
+    quad_state_.x(QS::OMEY) = EIGEN_PI * 3;
+    quad_state_.x(QS::OMEZ) = EIGEN_PI * 3;
 
   }
   // reset quadrotor with random states
