@@ -14,8 +14,7 @@ from stable_baselines import logger
 #
 from rl.lxx_baselines.common.policies import MlpPolicy
 from rl.lxx_baselines.ppo.ppo2 import PPO2
-from rl.lxx_baselines.ppo.ppo2_test import test_model
-from rl.lxx_baselines.ppo.BTC_test import btc_test_model
+from rl.BidirectionalThrustControl.test_neural_network import btc_test_model
 from rl.lxx_baselines.envs import vec_env_wrapper as wrapper
 import rl.lxx_baselines.common.util as U
 #
@@ -31,17 +30,17 @@ def configure_random_seed(seed, env=None):
 
 def parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--train', type=int, default=1,
+    parser.add_argument('--train', type=int, default=0,
                         help="To train new model or simply test pre-trained model")
-    parser.add_argument('--render', type=int, default=0,
+    parser.add_argument('--render', type=int, default=1,
                         help="Enable Unity Render")
     parser.add_argument('--save_dir', type=str, default=os.path.dirname(os.path.realpath(__file__)),
                         help="Directory where to save the checkpoints and training metrics")
     parser.add_argument('--seed', type=int, default=0,
                         help="Random seed")
-    parser.add_argument('-w', '--weight_1', type=str, default='./BTC.zip',
+    parser.add_argument('-w', '--weight_1', type=str, default='./neural_network_BTC.zip',
                         help='trained weight path')
-    parser.add_argument('-v', '--weight_2', type=str, default='./OPTC.zip',
+    parser.add_argument('-v', '--weight_2', type=str, default='./neural_network_OPTC.zip',
                         help='trained weight path')
     return parser
 
