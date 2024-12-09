@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.gridspec as gridspec
-# import csv
 
 
 def test_model(env, model, render=False):
@@ -33,10 +32,6 @@ def test_model(env, model, render=False):
     max_ep_length = env.max_episode_steps
     num_rollouts = 5
     
-    # with open("trajectory.csv","w") as csvfile:
-    #             writer = csv.writer(csvfile)
-    #             writer.writerow(['','t','px','py','pz','qw','qx','qy','qz','vx','vy','vz','omex','omey','omez','accx','accy','accz','taux','tauy','tauz','jerkx','jerky','jerkz','snapx','snapy','snapz','bomex','bomey','bomez','baccx','baccy','baccz','mot1','mot2','mot3','mot4','motdex1','motdex2','motdex3','motdex4','f1','f2','f3','f4'])
-
     if render:
         env.connectUnity()
     for n_roll in range(num_rollouts):
@@ -44,11 +39,6 @@ def test_model(env, model, render=False):
         actions = []
         obs, done, ep_len = env.reset(), False, 0
         while not (done or (ep_len >= max_ep_length)):
-                                
-            # with open("trajectory.csv","a") as csvfile:
-            #     writer = csv.writer(csvfile)
-            #     writer.writerow([obs[1],obs[2],obs[3],obs[4],obs[5],obs[6],obs[7],obs[8],obs[9],obs[10],obs[11],obs[12],0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
-
             act, _ = model.predict(obs, deterministic=True)
             obs, rew, done, infos = env.step(act)
             #
