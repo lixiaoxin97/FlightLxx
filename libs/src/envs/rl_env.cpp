@@ -106,9 +106,9 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
 
   // reset control command
   cmd_.t = 0.0;
-  cmd_.thrusts.setZero();
-  // cmd_.collective_thrust = 0.0;
-  // cmd_.omega.setZero();
+  // cmd_.thrusts.setZero();
+  cmd_.collective_thrust = 0.0;
+  cmd_.omega.setZero();
 
   // obtain observations
   getObs(obs);
