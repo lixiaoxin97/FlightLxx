@@ -91,7 +91,7 @@ def test_model(env, model, render=False):
             n_roll), label="trail: {0}".format(n_roll))
         ax_action2.step(t, actions[:, 2] * 3.1415926 , color="C{0}".format(
             n_roll), label="trail: {0}".format(n_roll))
-        ax_action3.step(t, actions[:, 3] * 0.78 * 9.81 * 2, color="C{0}".format(
+        ax_action3.step(t, actions[:, 3] * 9.81 * 2, color="C{0}".format(
             n_roll), label="act [0, 1, 2, 3] -- trail: {0}".format(n_roll))
 
     #
