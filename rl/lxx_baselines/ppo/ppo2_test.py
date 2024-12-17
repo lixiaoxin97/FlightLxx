@@ -85,23 +85,15 @@ def test_model(env, model, render=False):
         ax_euler_vz.step(t, deuler[:, 2], color="C{0}".format(
             n_roll), label=r"$\theta$ [x, y, z] -- trail: {0}".format(n_roll))
         # NP2G
-        ax_action0.step(t, actions[:, 0] * 0.78 * 9.81 / 2, color="C{0}".format(
+        ax_action0.step(t, actions[:, 0] * 3.1415926 * 2, color="C{0}".format(
             n_roll), label="trail: {0}".format(n_roll))
-        ax_action1.step(t, actions[:, 1] * 0.78 * 9.81 / 2, color="C{0}".format(
+        ax_action1.step(t, actions[:, 1] * 3.1415926 * 2, color="C{0}".format(
             n_roll), label="trail: {0}".format(n_roll))
-        ax_action2.step(t, actions[:, 2] * 0.78 * 9.81 / 2, color="C{0}".format(
+        ax_action2.step(t, actions[:, 2] * 3.1415926 , color="C{0}".format(
             n_roll), label="trail: {0}".format(n_roll))
-        ax_action3.step(t, actions[:, 3] * 0.78 * 9.81 / 2, color="C{0}".format(
+        ax_action3.step(t, actions[:, 3] * 0.78 * 9.81 * 2, color="C{0}".format(
             n_roll), label="act [0, 1, 2, 3] -- trail: {0}".format(n_roll))
-        # P2G
-        # ax_action0.step(t, actions[:, 0] * 0.78 * 9.81 / 4 + 0.78 * 9.81 / 4, color="C{0}".format(
-        #     n_roll), label="trail: {0}".format(n_roll))
-        # ax_action1.step(t, actions[:, 1] * 0.78 * 9.81 / 4 + 0.78 * 9.81 / 4, color="C{0}".format(
-        #     n_roll), label="trail: {0}".format(n_roll))
-        # ax_action2.step(t, actions[:, 2] * 0.78 * 9.81 / 4 + 0.78 * 9.81 / 4, color="C{0}".format(
-        #     n_roll), label="trail: {0}".format(n_roll))
-        # ax_action3.step(t, actions[:, 3] * 0.78 * 9.81 / 4 + 0.78 * 9.81 / 4, color="C{0}".format(
-        #     n_roll), label="act [0, 1, 2, 3] -- trail: {0}".format(n_roll))
+
     #
     if render:
         env.disconnectUnity()
