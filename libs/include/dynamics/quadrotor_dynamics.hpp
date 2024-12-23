@@ -73,8 +73,7 @@ class QuadrotorDynamics : DynamicsBase {
   Scalar motor_tau_inv_;
 
   // Propellers
-  Vector<3> thrust_map_p_;
-  Vector<3> thrust_map_n_;
+  Vector<3> thrust_map_;
   Scalar kappa_;
   Scalar thrust_min_;
   Scalar thrust_max_;

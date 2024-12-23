@@ -38,7 +38,7 @@ def parser():
                         help="Directory where to save the checkpoints and training metrics")
     parser.add_argument('--seed', type=int, default=0,
                         help="Random seed")
-    parser.add_argument('-w', '--weight', type=str, default='./LQAH_1.zip',
+    parser.add_argument('-w', '--weight', type=str, default='./TAE_3_AgileHover.zip',
                         help='trained weight path')
     return parser
 
@@ -77,11 +77,11 @@ def main():
             gamma=0.99,  # lower 0.9 ~ 0.99
             # n_steps=math.floor(cfg['env']['max_time'] / cfg['env']['ctl_dt']),
             n_steps=500,
-            ent_coef=0.00,
-            learning_rate=3e-4,
+            ent_coef=0.0001,
+            learning_rate=0.001,
             vf_coef=0.5,
             max_grad_norm=0.5,
-            nminibatches=1,
+            nminibatches=10,
             noptepochs=10,
             cliprange=0.2,
             verbose=1,

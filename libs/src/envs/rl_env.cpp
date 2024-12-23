@@ -37,12 +37,13 @@ QuadrotorEnv::QuadrotorEnv(const std::string &cfg_path)
   act_dim_ = quadenv::kNAct;
 
   Scalar mass = quadrotor_ptr_->getMass();
-  
-  // CTBR
-  act_mean_.segment<4>(0).setZero();
+  // act_mean_ = Vector<quadenv::kNAct>::Ones() * (-mass * Gz) / 4;
+  // act_std_ = Vector<quadenv::kNAct>::Ones() * (-mass * 2 * Gz) / 4;
+  act_mean_ = Vector<quadenv::kNAct>::Ones() * (-Gz) ;
+  act_mean_.segment<3>(0).setZero();
   act_std_ = Vector<quadenv::kNAct>::Ones() * 2 * 3.1415926;
   act_std_(2) = 3.1415926;
-  act_std_(3) = (-Gz*2);
+  act_std_(3) = (-Gz*1);
 
   // load parameters
   loadParam(cfg_);
@@ -55,8 +56,6 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
   quad_act_.setZero();
 
   if (random) {
-    
-    // train
     // randomly reset the quadrotor state
     // reset position
     quad_state_.x(QS::POSX) = uniform_dist_(random_gen_);
@@ -78,28 +77,6 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
     quad_state_.x(QS::OMEX) = uniform_dist_(random_gen_);
     quad_state_.x(QS::OMEY) = uniform_dist_(random_gen_);
     quad_state_.x(QS::OMEZ) = uniform_dist_(random_gen_);
-
-    // experiment
-    // quad_state_.x(QS::POSX) = 0;
-    // quad_state_.x(QS::POSY) = 0;
-    // quad_state_.x(QS::POSZ) = 5;
-    // if (quad_state_.x(QS::POSZ) < -0.0)
-    //   quad_state_.x(QS::POSZ) = -quad_state_.x(QS::POSZ);
-    // // reset linear velocity
-    // quad_state_.x(QS::VELX) = 5;
-    // quad_state_.x(QS::VELY) = 0;
-    // quad_state_.x(QS::VELZ) = 0;
-    // // reset orientation
-    // quad_state_.x(QS::ATTW) = 0;
-    // quad_state_.x(QS::ATTX) = 1;
-    // quad_state_.x(QS::ATTY) = 0;
-    // quad_state_.x(QS::ATTZ) = 0;
-    // quad_state_.qx /= quad_state_.qx.norm();
-    // // reset body rate
-    // quad_state_.x(QS::OMEX) = EIGEN_PI * 3;
-    // quad_state_.x(QS::OMEY) = EIGEN_PI * 3;
-    // quad_state_.x(QS::OMEZ) = EIGEN_PI * 3;
-
   }
   // reset quadrotor with random states
   quadrotor_ptr_->reset(quad_state_);
@@ -121,19 +98,17 @@ bool QuadrotorEnv::getObs(Ref<Vector<>> obs) {
   // convert quaternion to euler angle
   Vector<3> euler_zyx = quad_state_.q().toRotationMatrix().eulerAngles(2, 1, 0);
   // quaternionToEuler(quad_state_.q(), euler);
-  quad_obs_ << quad_state_.p - goal_state_.segment<quadenv::kNPos>(quadenv::kPos),
-               euler_zyx     - goal_state_.segment<quadenv::kNOri>(quadenv::kOri),
-               quad_state_.v - goal_state_.segment<quadenv::kNLinVel>(quadenv::kLinVel),
-               quad_state_.w - goal_state_.segment<quadenv::kNAngVel>(quadenv::kAngVel);
+  quad_obs_ << quad_state_.p, euler_zyx, quad_state_.v, quad_state_.w;
 
   obs.segment<quadenv::kNObs>(quadenv::kObs) = quad_obs_;
   return true;
 }
 
 Scalar QuadrotorEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
+//  quad_act_ = act.cwiseProduct(act_std_) + act_mean_;
   quad_act_ = act.cwiseProduct(act_std_) + act_mean_;
   cmd_.t += sim_dt_;
-  // cmd_.thrusts = quad_act_;
+  //cmd_.thrusts = quad_act_;
   cmd_.omega = quad_act_.segment<3>(0);
   cmd_.collective_thrust = quad_act_(3);
 
@@ -148,16 +123,24 @@ Scalar QuadrotorEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
   // ---------------------- reward function design
   // - position tracking
   Scalar pos_reward =
-    pos_coeff_ * (quad_obs_.segment<quadenv::kNPos>(quadenv::kPos)).squaredNorm();
+    pos_coeff_ * (quad_obs_.segment<quadenv::kNPos>(quadenv::kPos) -
+                  goal_state_.segment<quadenv::kNPos>(quadenv::kPos))
+                   .squaredNorm();
   // - orientation tracking
   Scalar ori_reward =
-    ori_coeff_ * (quad_obs_.segment<quadenv::kNOri>(quadenv::kOri)).squaredNorm();
+    ori_coeff_ * (quad_obs_.segment<quadenv::kNOri>(quadenv::kOri) -
+                  goal_state_.segment<quadenv::kNOri>(quadenv::kOri))
+                   .squaredNorm();
   // - linear velocity tracking
   Scalar lin_vel_reward =
-    lin_vel_coeff_ * (quad_obs_.segment<quadenv::kNLinVel>(quadenv::kLinVel)).squaredNorm();
+    lin_vel_coeff_ * (quad_obs_.segment<quadenv::kNLinVel>(quadenv::kLinVel) -
+                      goal_state_.segment<quadenv::kNLinVel>(quadenv::kLinVel))
+                       .squaredNorm();
   // - angular velocity tracking
   Scalar ang_vel_reward =
-    ang_vel_coeff_ * (quad_obs_.segment<quadenv::kNAngVel>(quadenv::kAngVel)).squaredNorm();
+    ang_vel_coeff_ * (quad_obs_.segment<quadenv::kNAngVel>(quadenv::kAngVel) -
+                      goal_state_.segment<quadenv::kNAngVel>(quadenv::kAngVel))
+                       .squaredNorm();
 
   // - control action penalty
   Scalar act_reward = act_coeff_ * act.cast<Scalar>().norm();
