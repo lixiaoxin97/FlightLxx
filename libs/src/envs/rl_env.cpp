@@ -37,13 +37,15 @@ QuadrotorEnv::QuadrotorEnv(const std::string &cfg_path)
   act_dim_ = quadenv::kNAct;
 
   Scalar mass = quadrotor_ptr_->getMass();
-  // act_mean_ = Vector<quadenv::kNAct>::Ones() * (-mass * Gz) / 4;
-  // act_std_ = Vector<quadenv::kNAct>::Ones() * (-mass * 2 * Gz) / 4;
+  //############################################################################
+  //############################## Action ######################################
   act_mean_ = Vector<quadenv::kNAct>::Ones() * (-Gz) ;
   act_mean_.segment<3>(0).setZero();
   act_std_ = Vector<quadenv::kNAct>::Ones() * 2 * 3.1415926;
   act_std_(2) = 3.1415926;
   act_std_(3) = (-Gz*1);
+  //############################################################################
+  //############################################################################
 
   // load parameters
   loadParam(cfg_);
@@ -57,6 +59,9 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
 
   if (random) {
     // randomly reset the quadrotor state
+    //############################################################################
+    //################################ State #####################################
+    // | P | Q | V | W |
     // reset position
     quad_state_.x(QS::POSX) = uniform_dist_(random_gen_);
     quad_state_.x(QS::POSY) = uniform_dist_(random_gen_);
@@ -77,6 +82,8 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
     quad_state_.x(QS::OMEX) = uniform_dist_(random_gen_);
     quad_state_.x(QS::OMEY) = uniform_dist_(random_gen_);
     quad_state_.x(QS::OMEZ) = uniform_dist_(random_gen_);
+    //############################################################################
+    //############################################################################
   }
   // reset quadrotor with random states
   quadrotor_ptr_->reset(quad_state_);
@@ -105,12 +112,15 @@ bool QuadrotorEnv::getObs(Ref<Vector<>> obs) {
 }
 
 Scalar QuadrotorEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
-//  quad_act_ = act.cwiseProduct(act_std_) + act_mean_;
+  //############################################################################
+  //############################## Action ######################################
+  // | Wx | Wy | Wz| CT |
   quad_act_ = act.cwiseProduct(act_std_) + act_mean_;
   cmd_.t += sim_dt_;
-  //cmd_.thrusts = quad_act_;
   cmd_.omega = quad_act_.segment<3>(0);
   cmd_.collective_thrust = quad_act_(3);
+  //############################################################################
+  //############################################################################
 
   // simulate quadrotor
   quadrotor_ptr_->run(cmd_, sim_dt_);
@@ -121,6 +131,9 @@ Scalar QuadrotorEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
   Matrix<3, 3> rot = quad_state_.q().toRotationMatrix();
 
   // ---------------------- reward function design
+  //############################################################################
+  //################################# Reward ###################################
+  // | pos | ori | lin | ang | act |
   // - position tracking
   Scalar pos_reward =
     pos_coeff_ * (quad_obs_.segment<quadenv::kNPos>(quadenv::kPos) -
@@ -151,9 +164,15 @@ Scalar QuadrotorEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
   // survival reward
   total_reward += 0.1;
 
+  //############################################################################
+  //############################################################################
+
   return total_reward;
 }
 
+//############################################################################
+//################################# Reward ###################################
+// | crash |
 bool QuadrotorEnv::isTerminalState(Scalar &reward) {
   if (quad_state_.x(QS::POSZ) <= 0.0) {
     reward = -10;
@@ -162,6 +181,8 @@ bool QuadrotorEnv::isTerminalState(Scalar &reward) {
   reward = 0.0;
   return false;
 }
+//############################################################################
+//############################################################################
 
 bool QuadrotorEnv::loadParam(const YAML::Node &cfg) {
   if (cfg["quadrotor_env"]) {

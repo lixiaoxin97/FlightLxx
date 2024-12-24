@@ -67,6 +67,13 @@ def main():
         rsg_root = os.path.dirname(os.path.abspath(__file__))
         log_dir = rsg_root
         saver = U.ConfigurationSaver(log_dir=log_dir)
+        #########################################################################
+        ################################# Agent #################################
+        # | policy | net_arch | act_fun |
+        # | lam | gamma | vf_coef | max_grad_norm | nminbatches | noptechos | cliprange | verbose |
+        # | ent_coef | learning_rate |
+        # | n_steps | total_timesteps |
+        #########################################################################
         model = PPO2(
             tensorboard_log=saver.data_dir,
             policy=MlpPolicy,  # check activation function
@@ -101,8 +108,10 @@ def main():
             total_timesteps=int(250000000),
             log_dir=saver.data_dir, logger=logger)
         model.save(saver.data_dir)
+        #########################################################################
+        #########################################################################
 
-    # # Testing mode with a trained weight
+    # Testing mode with a trained weight
     else:
         model = PPO2.load(args.weight)
         test_model(env, model, render=args.render)
