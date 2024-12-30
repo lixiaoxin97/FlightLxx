@@ -188,6 +188,28 @@ bool QuadrotorDynamics::updateParams(const YAML::Node& params) {
   }
 }
 
+//############################################################################
+//###################### Dynamic Randominzation ##############################
+//############################################################################
+bool QuadrotorDynamics::dynamicRandomization(){
+  std::default_random_engine e;
+  e.seed(time(0));
+  std::uniform_real_distribution<double> u1(0.5, 1.0);
+  mass_ = u1(e);
+  std::uniform_real_distribution<double> u2(0.1, 0.2);
+  arm_l_ = u2(e);
+  std::uniform_real_distribution<double> u3(0.0001, 0.05);
+  motor_tau_inv_ = (1.0 / u3(e));
+  std::uniform_real_distribution<double> u4(0.005, 0.02);
+  kappa_ = u4(e);
+  std::uniform_real_distribution<double> u5(1.0, 2.0);
+  J_ = J_ * u5(e);
+  return true;
+}
+//############################################################################
+//############################################################################
+//############################################################################
+
 bool QuadrotorDynamics::updateInertiaMarix() {
   if (!valid()) return false;
   t_BM_ = arm_l_ * sqrt(0.5) *

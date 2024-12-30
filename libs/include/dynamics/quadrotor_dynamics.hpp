@@ -3,6 +3,8 @@
 #include <yaml-cpp/yaml.h>
 #include <iostream>
 #include <memory>
+#include <random>
+#include <ctime>
 
 #include "logger.hpp"
 #include "math.hpp"
@@ -28,6 +30,7 @@ class QuadrotorDynamics : DynamicsBase {
   // help functions
   bool valid() const;
   bool updateParams(const YAML::Node& params);
+  bool dynamicRandomization();
   bool showQuadrotorDynamicsParams();
 
   // Helpers to apply limits.

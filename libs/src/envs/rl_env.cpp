@@ -21,10 +21,10 @@ QuadrotorEnv::QuadrotorEnv(const std::string &cfg_path)
 
   quadrotor_ptr_ = std::make_shared<Quadrotor>();
   // update dynamics
-  QuadrotorDynamics dynamics;
-  dynamics.updateParams(cfg_);
-  dynamics.showQuadrotorDynamicsParams();
-  quadrotor_ptr_->updateDynamics(dynamics);
+  // QuadrotorDynamics dynamics;
+  // dynamics.updateParams(cfg_);
+  // dynamics.showQuadrotorDynamicsParams();
+  // quadrotor_ptr_->updateDynamics(dynamics);
 
   // define a bounding box
   world_box_ << -20, 20, -20, 20, 0, 20;
@@ -85,6 +85,22 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
     //############################################################################
     //############################################################################
   }
+
+
+  //############################################################################
+  //###################### Dynamic Randominzation ##############################
+  //############################################################################
+  YAML::Node cfg_ = YAML::LoadFile(getenv("FlightLxx_PATH") + std::string("/libs/config/rl_env.yaml"));
+  QuadrotorDynamics dynamics;
+  dynamics.updateParams(cfg_);
+  dynamics.dynamicRandomization();
+  dynamics.showQuadrotorDynamicsParams();
+  quadrotor_ptr_->updateDynamics(dynamics);
+  //############################################################################
+  //############################################################################
+  //############################################################################
+
+
   // reset quadrotor with random states
   quadrotor_ptr_->reset(quad_state_);
 
