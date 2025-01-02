@@ -63,15 +63,15 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
     //################################ State #####################################
     // | P | Q | V | W |
     // reset position
-    quad_state_.x(QS::POSX) = uniform_dist_(random_gen_);
-    quad_state_.x(QS::POSY) = uniform_dist_(random_gen_);
-    quad_state_.x(QS::POSZ) = uniform_dist_(random_gen_) + 5;
+    quad_state_.x(QS::POSX) = uniform_dist_(random_gen_) * 1.5;
+    quad_state_.x(QS::POSY) = uniform_dist_(random_gen_) * 1.5;
+    quad_state_.x(QS::POSZ) = uniform_dist_(random_gen_) * 1.5 + 5;
     if (quad_state_.x(QS::POSZ) < -0.0)
       quad_state_.x(QS::POSZ) = -quad_state_.x(QS::POSZ);
     // reset linear velocity
-    quad_state_.x(QS::VELX) = uniform_dist_(random_gen_);
-    quad_state_.x(QS::VELY) = uniform_dist_(random_gen_);
-    quad_state_.x(QS::VELZ) = uniform_dist_(random_gen_);
+    quad_state_.x(QS::VELX) = uniform_dist_(random_gen_) * 3;
+    quad_state_.x(QS::VELY) = uniform_dist_(random_gen_) * 3;
+    quad_state_.x(QS::VELZ) = uniform_dist_(random_gen_) * 3;
     // reset orientation
     quad_state_.x(QS::ATTW) = uniform_dist_(random_gen_);
     quad_state_.x(QS::ATTX) = uniform_dist_(random_gen_);
@@ -79,9 +79,9 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
     quad_state_.x(QS::ATTZ) = uniform_dist_(random_gen_);
     quad_state_.qx /= quad_state_.qx.norm();
     // reset body rate
-    quad_state_.x(QS::OMEX) = uniform_dist_(random_gen_);
-    quad_state_.x(QS::OMEY) = uniform_dist_(random_gen_);
-    quad_state_.x(QS::OMEZ) = uniform_dist_(random_gen_);
+    quad_state_.x(QS::OMEX) = uniform_dist_(random_gen_) * 3.1415926;
+    quad_state_.x(QS::OMEY) = uniform_dist_(random_gen_) * 3.1415926;
+    quad_state_.x(QS::OMEZ) = uniform_dist_(random_gen_) * 3.1415926;
     //############################################################################
     //############################################################################
   }
