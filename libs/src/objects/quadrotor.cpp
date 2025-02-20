@@ -42,33 +42,45 @@ bool Quadrotor::run(const Scalar ctl_dt) {
 
   // simulation loop
   while (remain_ctl_dt > 0.0) {
+    // const Scalar sim_dt = std::min(remain_ctl_dt, max_dt);
+
+    // const Vector<4> motor_thrusts_des =
+    //   cmd_.isSingleRotorThrusts() ? cmd_.thrusts
+    //                               : runFlightCtl(sim_dt, state_.w, cmd_);
+
+    // runMotors(sim_dt, motor_thrusts_des);
+    // // motor_thrusts_ = cmd_.thrusts;
+
+    // const Vector<4> force_torques = B_allocation_ * motor_thrusts_;
+
+    // // Compute linear acceleration and body torque
+    // const Vector<3> force(0.0, 0.0, force_torques[0]);
+    // state_.a = state_.q() * force * 1.0 / dynamics_.getMass() + gz_;
+
+    // // compute body torque
+    // state_.tau = force_torques.segment<3>(1);
+
+    // // dynamics integration
+    // integrator_ptr_->step(state_.x, sim_dt, next_state.x);
+
+    // // update state and sim time
+    // state_.qx /= state_.qx.norm();
+
+    // //
+    // state_.x = next_state.x;
+    // remain_ctl_dt -= sim_dt;
+
+
     const Scalar sim_dt = std::min(remain_ctl_dt, max_dt);
-
-    const Vector<4> motor_thrusts_des =
-      cmd_.isSingleRotorThrusts() ? cmd_.thrusts
-                                  : runFlightCtl(sim_dt, state_.w, cmd_);
-
-    runMotors(sim_dt, motor_thrusts_des);
-    // motor_thrusts_ = cmd_.thrusts;
-
-    const Vector<4> force_torques = B_allocation_ * motor_thrusts_;
-
-    // Compute linear acceleration and body torque
-    const Vector<3> force(0.0, 0.0, force_torques[0]);
-    state_.a = state_.q() * force * 1.0 / dynamics_.getMass() + gz_;
-
-    // compute body torque
-    state_.tau = force_torques.segment<3>(1);
-
-    // dynamics integration
+    const Vector<3> force(0.0, 0.0, cmd_.collective_thrust);
+    state_.a = state_.q() * force + gz_;
+    state_.w = cmd_.omega;
     integrator_ptr_->step(state_.x, sim_dt, next_state.x);
-
-    // update state and sim time
     state_.qx /= state_.qx.norm();
-
-    //
     state_.x = next_state.x;
     remain_ctl_dt -= sim_dt;
+
+
   }
   state_.t += ctl_dt;
   //
