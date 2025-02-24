@@ -36,7 +36,11 @@ bool QuadrotorDynamics::dState(const Ref<const Vector<QuadState::SIZE>> state,
   //
   const Vector<3> omega(state(QS::OMEX), state(QS::OMEY), state(QS::OMEZ));
   const Quaternion q_omega(0, omega.x(), omega.y(), omega.z());
-  // const Vector<3> body_torque = state.segment<QS::NTAU>(QS::TAU);
+  
+  // ###################################################################################
+  // ################################# Only Kinematics #################################
+  const Vector<3> body_torque = state.segment<QS::NTAU>(QS::TAU);
+  // ###################################################################################
 
   // linear velocity = dx / dt
   dstate.segment<QS::NPOS>(QS::POS) = state.segment<QS::NVEL>(QS::VEL);
@@ -48,10 +52,13 @@ bool QuadrotorDynamics::dState(const Ref<const Vector<QuadState::SIZE>> state,
   // linear acceleration = dv / dt
   dstate.segment<QS::NVEL>(QS::VEL) = state.segment<QS::NACC>(QS::ACC);
 
+  // ###################################################################################
+  // ################################# Only Kinematics #################################
   // angular accleration = domega / dt
-  // dstate.segment<QS::NOME>(QS::OME) =
-  //   J_inv_ * (body_torque - omega.cross(J_ * omega));
-  //
+  dstate.segment<QS::NOME>(QS::OME) =
+    J_inv_ * (body_torque - omega.cross(J_ * omega));
+  // ###################################################################################
+  
   return true;
 }
 
@@ -217,7 +224,7 @@ bool QuadrotorDynamics::updateInertiaMarix() {
   //############################################################################
   //############################## Environment #################################
   // | J |
-  J_ = mass_ / 12.0 * arm_l_ * arm_l_ * Vector<3>(4.5, 4.5, 7).asDiagonal();
+  J_ = mass_ / 24.0 * arm_l_ * arm_l_ * Vector<3>(4.5, 4.5, 7).asDiagonal();
   //############################################################################
   //############################################################################
   J_inv_ = J_.inverse();
