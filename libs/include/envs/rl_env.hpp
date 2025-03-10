@@ -76,6 +76,12 @@ class QuadrotorEnv final : public EnvBase {
   // Define reward for training
   Scalar pos_coeff_, ori_coeff_, lin_vel_coeff_, ang_vel_coeff_, act_coeff_;
 
+  // target position
+  Vector<3> target_pos_;
+
+  // distance before and after , coefficient
+  Scalar d_before_, d_after_, d_coeff_;
+
   // observations and actions (for RL)
   Vector<quadenv::kNObs> quad_obs_;
   Vector<quadenv::kNAct> quad_act_;

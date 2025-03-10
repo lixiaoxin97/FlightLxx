@@ -13,6 +13,7 @@ QuadrotorEnv::QuadrotorEnv(const std::string &cfg_path)
     lin_vel_coeff_(0.0),
     ang_vel_coeff_(0.0),
     act_coeff_(0.0),
+    d_coeff_(-1.0),
     goal_state_((Vector<quadenv::kNObs>() << 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 0.0,
                  0.0, 0.0, 0.0, 0.0, 0.0)
                   .finished()) {
@@ -23,11 +24,11 @@ QuadrotorEnv::QuadrotorEnv(const std::string &cfg_path)
   
   //###################### Dynamic Randominzation ##############################
   //############################################################################
-  // // update dynamics
-  // QuadrotorDynamics dynamics;
-  // dynamics.updateParams(cfg_);
-  // dynamics.showQuadrotorDynamicsParams();
-  // quadrotor_ptr_->updateDynamics(dynamics);
+  // update dynamics
+  QuadrotorDynamics dynamics;
+  dynamics.updateParams(cfg_);
+  dynamics.showQuadrotorDynamicsParams();
+  quadrotor_ptr_->updateDynamics(dynamics);
   //############################################################################
 
   // define a bounding box
@@ -59,6 +60,7 @@ QuadrotorEnv::~QuadrotorEnv() {}
 
 bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
   quad_state_.setZero();
+  target_pos_.setZero();
   quad_act_.setZero();
 
   if (random) {
@@ -67,25 +69,48 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
     //################################ State #####################################
     // | P | Q | V | W |
     // reset position
-    quad_state_.x(QS::POSX) = uniform_dist_(random_gen_);
-    quad_state_.x(QS::POSY) = uniform_dist_(random_gen_);
-    quad_state_.x(QS::POSZ) = uniform_dist_(random_gen_) + 5;
+    quad_state_.x(QS::POSX) = uniform_dist_(random_gen_) * 5;
+    quad_state_.x(QS::POSY) = uniform_dist_(random_gen_) * 5;
+    quad_state_.x(QS::POSZ) = uniform_dist_(random_gen_) * 1.25 + 1.25;
     if (quad_state_.x(QS::POSZ) < -0.0)
       quad_state_.x(QS::POSZ) = -quad_state_.x(QS::POSZ);
+    // quad_state_.x(QS::POSX) = 0;
+    // quad_state_.x(QS::POSY) = 0;
+    // quad_state_.x(QS::POSZ) = 3;
+    // if (quad_state_.x(QS::POSZ) < -0.0)
+    //   quad_state_.x(QS::POSZ) = -quad_state_.x(QS::POSZ);
     // reset linear velocity
-    quad_state_.x(QS::VELX) = uniform_dist_(random_gen_);
-    quad_state_.x(QS::VELY) = uniform_dist_(random_gen_);
-    quad_state_.x(QS::VELZ) = uniform_dist_(random_gen_);
+    // quad_state_.x(QS::VELX) = uniform_dist_(random_gen_);
+    // quad_state_.x(QS::VELY) = uniform_dist_(random_gen_);
+    // quad_state_.x(QS::VELZ) = uniform_dist_(random_gen_);
+    quad_state_.x(QS::VELX) = 0;
+    quad_state_.x(QS::VELY) = 0;
+    quad_state_.x(QS::VELZ) = 0;
     // reset orientation
-    quad_state_.x(QS::ATTW) = uniform_dist_(random_gen_);
-    quad_state_.x(QS::ATTX) = uniform_dist_(random_gen_);
-    quad_state_.x(QS::ATTY) = uniform_dist_(random_gen_);
-    quad_state_.x(QS::ATTZ) = uniform_dist_(random_gen_);
+    // quad_state_.x(QS::ATTW) = uniform_dist_(random_gen_);
+    // quad_state_.x(QS::ATTX) = uniform_dist_(random_gen_);
+    // quad_state_.x(QS::ATTY) = uniform_dist_(random_gen_);
+    // quad_state_.x(QS::ATTZ) = uniform_dist_(random_gen_);
+    // quad_state_.qx /= quad_state_.qx.norm();
+    quad_state_.x(QS::ATTW) = 1;
+    quad_state_.x(QS::ATTX) = 0;
+    quad_state_.x(QS::ATTY) = 0;
+    quad_state_.x(QS::ATTZ) = 0;
     quad_state_.qx /= quad_state_.qx.norm();
     // reset body rate
-    quad_state_.x(QS::OMEX) = uniform_dist_(random_gen_);
-    quad_state_.x(QS::OMEY) = uniform_dist_(random_gen_);
-    quad_state_.x(QS::OMEZ) = uniform_dist_(random_gen_);
+    // quad_state_.x(QS::OMEX) = uniform_dist_(random_gen_);
+    // quad_state_.x(QS::OMEY) = uniform_dist_(random_gen_);
+    // quad_state_.x(QS::OMEZ) = uniform_dist_(random_gen_);
+    quad_state_.x(QS::OMEX) = 0;
+    quad_state_.x(QS::OMEY) = 0;
+    quad_state_.x(QS::OMEZ) = 0;
+    // reset target position
+    // target_pos_(0) = uniform_dist_(random_gen_) * 5;
+    // target_pos_(1) = uniform_dist_(random_gen_) * 5;
+    // target_pos_(2) = uniform_dist_(random_gen_) * 1.5 + 5;
+    target_pos_(0) = 0;
+    target_pos_(1) = 0;
+    target_pos_(2) = 1.25;
     //############################################################################
     //############################################################################
   }
@@ -94,12 +119,12 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
   //############################################################################
   //###################### Dynamic Randominzation ##############################
   //############################################################################
-  YAML::Node cfg_ = YAML::LoadFile(getenv("FlightLxx_PATH") + std::string("/libs/config/rl_env.yaml"));
-  QuadrotorDynamics dynamics;
-  dynamics.updateParams(cfg_);
-  dynamics.dynamicRandomization();
-  dynamics.showQuadrotorDynamicsParams();
-  quadrotor_ptr_->updateDynamics(dynamics);
+  // YAML::Node cfg_ = YAML::LoadFile(getenv("FlightLxx_PATH") + std::string("/libs/config/rl_env.yaml"));
+  // QuadrotorDynamics dynamics;
+  // dynamics.updateParams(cfg_);
+  // dynamics.dynamicRandomization();
+  // dynamics.showQuadrotorDynamicsParams();
+  // quadrotor_ptr_->updateDynamics(dynamics);
   //############################################################################
   //############################################################################
   //############################################################################
@@ -125,7 +150,7 @@ bool QuadrotorEnv::getObs(Ref<Vector<>> obs) {
   // convert quaternion to euler angle
   Vector<3> euler_zyx = quad_state_.q().toRotationMatrix().eulerAngles(2, 1, 0);
   // quaternionToEuler(quad_state_.q(), euler);
-  quad_obs_ << quad_state_.p, euler_zyx, quad_state_.v, quad_state_.w;
+  quad_obs_ << quad_state_.p - target_pos_, euler_zyx, quad_state_.v, quad_state_.w;
 
   obs.segment<quadenv::kNObs>(quadenv::kObs) = quad_obs_;
   return true;
@@ -142,11 +167,15 @@ Scalar QuadrotorEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
   //############################################################################
   //############################################################################
 
+  d_before_ = (quad_state_.p - target_pos_).norm();
+
   // simulate quadrotor
   quadrotor_ptr_->run(cmd_, sim_dt_);
 
   // update observations
   getObs(obs);
+
+  d_after_ = (quad_state_.p - target_pos_).norm();
 
   Matrix<3, 3> rot = quad_state_.q().toRotationMatrix();
 
@@ -154,35 +183,34 @@ Scalar QuadrotorEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
   //############################################################################
   //################################# Reward ###################################
   // | pos | ori | lin | ang | act |
-  // - position tracking
-  Scalar pos_reward =
-    pos_coeff_ * (quad_obs_.segment<quadenv::kNPos>(quadenv::kPos) -
-                  goal_state_.segment<quadenv::kNPos>(quadenv::kPos))
-                   .squaredNorm();
-  // - orientation tracking
-  Scalar ori_reward =
-    ori_coeff_ * (quad_obs_.segment<quadenv::kNOri>(quadenv::kOri) -
-                  goal_state_.segment<quadenv::kNOri>(quadenv::kOri))
-                   .squaredNorm();
-  // - linear velocity tracking
-  Scalar lin_vel_reward =
-    lin_vel_coeff_ * (quad_obs_.segment<quadenv::kNLinVel>(quadenv::kLinVel) -
-                      goal_state_.segment<quadenv::kNLinVel>(quadenv::kLinVel))
-                       .squaredNorm();
-  // - angular velocity tracking
+  // // - position tracking
+  // Scalar pos_reward =
+  //   pos_coeff_ * (quad_obs_.segment<quadenv::kNPos>(quadenv::kPos) -
+  //                 goal_state_.segment<quadenv::kNPos>(quadenv::kPos))
+  //                  .squaredNorm();
+  // // - orientation tracking
+  // Scalar ori_reward =
+  //   ori_coeff_ * (quad_obs_.segment<quadenv::kNOri>(quadenv::kOri) -
+  //                 goal_state_.segment<quadenv::kNOri>(quadenv::kOri))
+  //                  .squaredNorm();
+  // // - linear velocity tracking
+  // Scalar lin_vel_reward =
+  //   lin_vel_coeff_ * (quad_obs_.segment<quadenv::kNLinVel>(quadenv::kLinVel) -
+  //                     goal_state_.segment<quadenv::kNLinVel>(quadenv::kLinVel))
+  //                      .squaredNorm();
+  // // - angular velocity tracking
   Scalar ang_vel_reward =
     ang_vel_coeff_ * (quad_obs_.segment<quadenv::kNAngVel>(quadenv::kAngVel) -
                       goal_state_.segment<quadenv::kNAngVel>(quadenv::kAngVel))
                        .squaredNorm();
+  // 
+  // // - control action penalty
+  // Scalar act_reward = act_coeff_ * act.cast<Scalar>().norm();
 
-  // - control action penalty
-  Scalar act_reward = act_coeff_ * act.cast<Scalar>().norm();
+  Scalar total_reward = d_coeff_ * (d_after_ - d_before_) + ang_vel_reward;
 
-  Scalar total_reward =
-    pos_reward + ori_reward + lin_vel_reward + ang_vel_reward + act_reward;
-
-  // survival reward
-  total_reward += 0.1;
+  // // survival reward
+  // total_reward += 0.1;
 
   //############################################################################
   //############################################################################
@@ -195,7 +223,11 @@ Scalar QuadrotorEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
 // | crash |
 bool QuadrotorEnv::isTerminalState(Scalar &reward) {
   if (quad_state_.x(QS::POSZ) <= 0.0) {
-    reward = -10;
+    reward = 0.0;
+    return true;
+  }
+  if ((quad_state_.p - target_pos_).norm() <= 0.2) {
+    reward = 0.0;
     return true;
   }
   reward = 0.0;
