@@ -38,7 +38,7 @@ def parser():
                         help="Directory where to save the checkpoints and training metrics")
     parser.add_argument('--seed', type=int, default=0,
                         help="Random seed")
-    parser.add_argument('-w', '--weight', type=str, default='./TAE_5_LQFF.zip',
+    parser.add_argument('-w', '--weight', type=str, default='./LQFF_again.zip',
                         help='trained weight path')
     return parser
 

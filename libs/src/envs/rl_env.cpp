@@ -25,10 +25,10 @@ QuadrotorEnv::QuadrotorEnv(const std::string &cfg_path)
   //###################### Dynamic Randominzation ##############################
   //############################################################################
   // update dynamics
-  QuadrotorDynamics dynamics;
-  dynamics.updateParams(cfg_);
-  dynamics.showQuadrotorDynamicsParams();
-  quadrotor_ptr_->updateDynamics(dynamics);
+  // QuadrotorDynamics dynamics;
+  // dynamics.updateParams(cfg_);
+  // dynamics.showQuadrotorDynamicsParams();
+  // quadrotor_ptr_->updateDynamics(dynamics);
   //############################################################################
 
   // define a bounding box
@@ -68,10 +68,10 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
     //############################################################################
     //################################ State #####################################
     // | P | Q | V | W |
-    // reset position
-    quad_state_.x(QS::POSX) = uniform_dist_(random_gen_) * 5;
-    quad_state_.x(QS::POSY) = uniform_dist_(random_gen_) * 5;
-    quad_state_.x(QS::POSZ) = uniform_dist_(random_gen_) * 1.25 + 1.25;
+    // reset position #############################################
+    quad_state_.x(QS::POSX) = uniform_dist_(random_gen_) * 20;
+    quad_state_.x(QS::POSY) = uniform_dist_(random_gen_) * 20;
+    quad_state_.x(QS::POSZ) = uniform_dist_(random_gen_) * 5 + 10;
     if (quad_state_.x(QS::POSZ) < -0.0)
       quad_state_.x(QS::POSZ) = -quad_state_.x(QS::POSZ);
     // quad_state_.x(QS::POSX) = 0;
@@ -79,38 +79,38 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
     // quad_state_.x(QS::POSZ) = 3;
     // if (quad_state_.x(QS::POSZ) < -0.0)
     //   quad_state_.x(QS::POSZ) = -quad_state_.x(QS::POSZ);
-    // reset linear velocity
-    // quad_state_.x(QS::VELX) = uniform_dist_(random_gen_);
-    // quad_state_.x(QS::VELY) = uniform_dist_(random_gen_);
-    // quad_state_.x(QS::VELZ) = uniform_dist_(random_gen_);
-    quad_state_.x(QS::VELX) = 0;
-    quad_state_.x(QS::VELY) = 0;
-    quad_state_.x(QS::VELZ) = 0;
-    // reset orientation
-    // quad_state_.x(QS::ATTW) = uniform_dist_(random_gen_);
-    // quad_state_.x(QS::ATTX) = uniform_dist_(random_gen_);
-    // quad_state_.x(QS::ATTY) = uniform_dist_(random_gen_);
-    // quad_state_.x(QS::ATTZ) = uniform_dist_(random_gen_);
-    // quad_state_.qx /= quad_state_.qx.norm();
-    quad_state_.x(QS::ATTW) = 1;
-    quad_state_.x(QS::ATTX) = 0;
-    quad_state_.x(QS::ATTY) = 0;
-    quad_state_.x(QS::ATTZ) = 0;
+    // reset linear velocity ######################################
+    quad_state_.x(QS::VELX) = uniform_dist_(random_gen_);
+    quad_state_.x(QS::VELY) = uniform_dist_(random_gen_);
+    quad_state_.x(QS::VELZ) = uniform_dist_(random_gen_);
+    // quad_state_.x(QS::VELX) = 0;
+    // quad_state_.x(QS::VELY) = 0;
+    // quad_state_.x(QS::VELZ) = 0;
+    // reset orientation ##########################################
+    quad_state_.x(QS::ATTW) = uniform_dist_(random_gen_);
+    quad_state_.x(QS::ATTX) = uniform_dist_(random_gen_);
+    quad_state_.x(QS::ATTY) = uniform_dist_(random_gen_);
+    quad_state_.x(QS::ATTZ) = uniform_dist_(random_gen_);
     quad_state_.qx /= quad_state_.qx.norm();
-    // reset body rate
-    // quad_state_.x(QS::OMEX) = uniform_dist_(random_gen_);
-    // quad_state_.x(QS::OMEY) = uniform_dist_(random_gen_);
-    // quad_state_.x(QS::OMEZ) = uniform_dist_(random_gen_);
-    quad_state_.x(QS::OMEX) = 0;
-    quad_state_.x(QS::OMEY) = 0;
-    quad_state_.x(QS::OMEZ) = 0;
-    // reset target position
+    // quad_state_.x(QS::ATTW) = 1;
+    // quad_state_.x(QS::ATTX) = 0;
+    // quad_state_.x(QS::ATTY) = 0;
+    // quad_state_.x(QS::ATTZ) = 0;
+    // quad_state_.qx /= quad_state_.qx.norm();
+    // reset body rate ############################################
+    quad_state_.x(QS::OMEX) = uniform_dist_(random_gen_);
+    quad_state_.x(QS::OMEY) = uniform_dist_(random_gen_);
+    quad_state_.x(QS::OMEZ) = uniform_dist_(random_gen_);
+    // quad_state_.x(QS::OMEX) = 0;
+    // quad_state_.x(QS::OMEY) = 0;
+    // quad_state_.x(QS::OMEZ) = 0;
+    // reset target position ######################################
+    target_pos_(0) = 0;
+    target_pos_(1) = 0;
+    target_pos_(2) = 10;
     // target_pos_(0) = uniform_dist_(random_gen_) * 5;
     // target_pos_(1) = uniform_dist_(random_gen_) * 5;
     // target_pos_(2) = uniform_dist_(random_gen_) * 1.5 + 5;
-    target_pos_(0) = 0;
-    target_pos_(1) = 0;
-    target_pos_(2) = 1.25;
     //############################################################################
     //############################################################################
   }
@@ -119,12 +119,12 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
   //############################################################################
   //###################### Dynamic Randominzation ##############################
   //############################################################################
-  // YAML::Node cfg_ = YAML::LoadFile(getenv("FlightLxx_PATH") + std::string("/libs/config/rl_env.yaml"));
-  // QuadrotorDynamics dynamics;
-  // dynamics.updateParams(cfg_);
-  // dynamics.dynamicRandomization();
-  // dynamics.showQuadrotorDynamicsParams();
-  // quadrotor_ptr_->updateDynamics(dynamics);
+  YAML::Node cfg_ = YAML::LoadFile(getenv("FlightLxx_PATH") + std::string("/libs/config/rl_env.yaml"));
+  QuadrotorDynamics dynamics;
+  dynamics.updateParams(cfg_);
+  dynamics.dynamicRandomization();
+  dynamics.showQuadrotorDynamicsParams();
+  quadrotor_ptr_->updateDynamics(dynamics);
   //############################################################################
   //############################################################################
   //############################################################################
