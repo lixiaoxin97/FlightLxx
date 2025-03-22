@@ -168,6 +168,7 @@ Scalar QuadrotorEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
   //############################################################################
 
   d_before_ = (quad_state_.p - target_pos_).norm();
+  postion_before_ = quad_state_.p;
 
   // simulate quadrotor
   quadrotor_ptr_->run(cmd_, sim_dt_);
@@ -176,6 +177,9 @@ Scalar QuadrotorEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
   getObs(obs);
 
   d_after_ = (quad_state_.p - target_pos_).norm();
+  postion_after_ = quad_state_.p;
+  distance_to_target_position_ = distanceToSegment(postion_before_, postion_after_, target_pos_);
+  // std::cout << "distance_to_target_position: " << distance_to_target_position_ << std::endl;
 
   Matrix<3, 3> rot = quad_state_.q().toRotationMatrix();
 
@@ -207,7 +211,13 @@ Scalar QuadrotorEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
   // // - control action penalty
   // Scalar act_reward = act_coeff_ * act.cast<Scalar>().norm();
 
-  Scalar total_reward = d_coeff_ * (d_after_ - d_before_) + ang_vel_reward;
+  Scalar total_reward = 0.0;
+  
+  if (distance_to_target_position_ <= 1.0) {
+    total_reward = d_coeff_ * ( - d_after_ - d_before_) + ang_vel_reward;
+  }else{
+    total_reward = d_coeff_ * (d_after_ - d_before_) + ang_vel_reward;
+  }
 
   // // survival reward
   // total_reward += 0.1;
@@ -226,7 +236,7 @@ bool QuadrotorEnv::isTerminalState(Scalar &reward) {
     reward = 0.0;
     return true;
   }
-  if ((quad_state_.p - target_pos_).norm() <= 0.2) {
+  if (distance_to_target_position_ <= 1.0) {
     reward = 0.0;
     return true;
   }
@@ -288,6 +298,52 @@ std::ostream &operator<<(std::ostream &os, const QuadrotorEnv &quad_env) {
      << "obs_std =            [" << quad_env.obs_std_.transpose() << std::endl;
   os.precision();
   return os;
+}
+
+Scalar distanceToSegment(const Vector<3>& A, 
+                        const Vector<3>& B,
+                        const Vector<3>& P) {
+    // 确保输入为三维坐标点
+    // assert(A.size() == 3 && B.size() == 3 && P.size() == 3);
+    
+    // 计算向量 AB
+    Vector<3> AB = {B[0]-A[0], B[1]-A[1], B[2]-A[2]};
+    
+    // 处理线段退化为点的情况
+    Scalar abSquared = AB[0]*AB[0] + AB[1]*AB[1] + AB[2]*AB[2];
+    if (abSquared == 0) {
+        // PA 向量
+        Vector<3> PA = {P[0]-A[0], P[1]-A[1], P[2]-A[2]};
+        return sqrt(PA[0]*PA[0] + PA[1]*PA[1] + PA[2]*PA[2]);
+    }
+    
+    // 计算向量 AP
+    Vector<3> AP = {P[0]-A[0], P[1]-A[1], P[2]-A[2]};
+    
+    // 计算投影参数 t0 = (AP · AB) / |AB|²
+    Scalar apDotAB = AP[0]*AB[0] + AP[1]*AB[1] + AP[2]*AB[2];
+    Scalar t0 = apDotAB / abSquared;
+    
+    // 根据投影位置计算最近距离
+    if (t0 <= 0.0) { // 最近点为 A
+        return sqrt(AP[0]*AP[0] + AP[1]*AP[1] + AP[2]*AP[2]);
+    } 
+    else if (t0 >= 1.0) { // 最近点为 B
+        Vector<3> BP = {P[0]-B[0], P[1]-B[1], P[2]-B[2]};
+        return sqrt(BP[0]*BP[0] + BP[1]*BP[1] + BP[2]*BP[2]);
+    }
+    else { // 投影在线段上，使用叉乘计算垂直距离
+        // 计算叉乘 AP × AB
+        Vector<3> cross = {
+            AP[1]*AB[2] - AP[2]*AB[1],
+            AP[2]*AB[0] - AP[0]*AB[2],
+            AP[0]*AB[1] - AP[1]*AB[0]
+        };
+        
+        // 叉乘模长 / AB模长
+        Scalar crossNorm = sqrt(cross[0]*cross[0] + cross[1]*cross[1] + cross[2]*cross[2]);
+        return crossNorm / sqrt(abSquared);
+    }
 }
 
 }  // namespace flightlib

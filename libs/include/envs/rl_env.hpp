@@ -79,6 +79,11 @@ class QuadrotorEnv final : public EnvBase {
   // target position
   Vector<3> target_pos_;
 
+  // postion before and after, distance to target_position
+  Vector<3> postion_before_;
+  Vector<3> postion_after_;
+  Scalar distance_to_target_position_;
+
   // distance before and after , coefficient
   Scalar d_before_, d_after_, d_coeff_;
 
@@ -98,5 +103,9 @@ class QuadrotorEnv final : public EnvBase {
   YAML::Node cfg_;
   Matrix<3, 2> world_box_;
 };
+
+Scalar distanceToSegment(const Vector<3>& A, 
+                        const Vector<3>& B,
+                        const Vector<3>& P);
 
 }  // namespace flightlib
