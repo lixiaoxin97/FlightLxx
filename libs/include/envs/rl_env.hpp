@@ -80,8 +80,8 @@ class QuadrotorEnv final : public EnvBase {
   Vector<3> target_pos_;
 
   // postion before and after, distance to target_position
-  Vector<3> postion_before_;
-  Vector<3> postion_after_;
+  Vector<3> position_before_;
+  Vector<3> position_after_;
   Scalar distance_to_target_position_;
 
   // distance before and after , coefficient
@@ -90,6 +90,9 @@ class QuadrotorEnv final : public EnvBase {
   // observations and actions (for RL)
   Vector<quadenv::kNObs> quad_obs_;
   Vector<quadenv::kNAct> quad_act_;
+
+  // initial position
+  Vector<3> position_initial_;
 
   // reward function design (for model-free reinforcement learning)
   Vector<quadenv::kNObs> goal_state_;

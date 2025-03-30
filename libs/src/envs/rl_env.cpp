@@ -25,10 +25,10 @@ QuadrotorEnv::QuadrotorEnv(const std::string &cfg_path)
   //###################### Dynamic Randominzation ##############################
   //############################################################################
   // update dynamics
-  // QuadrotorDynamics dynamics;
-  // dynamics.updateParams(cfg_);
-  // dynamics.showQuadrotorDynamicsParams();
-  // quadrotor_ptr_->updateDynamics(dynamics);
+  QuadrotorDynamics dynamics;
+  dynamics.updateParams(cfg_);
+  dynamics.showQuadrotorDynamicsParams();
+  quadrotor_ptr_->updateDynamics(dynamics);
   //############################################################################
 
   // define a bounding box
@@ -74,6 +74,7 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
     quad_state_.x(QS::POSZ) = uniform_dist_(random_gen_) * 5 + 10;
     if (quad_state_.x(QS::POSZ) < -0.0)
       quad_state_.x(QS::POSZ) = -quad_state_.x(QS::POSZ);
+    position_initial_ = quad_state_.p;
     // quad_state_.x(QS::POSX) = 0;
     // quad_state_.x(QS::POSY) = 0;
     // quad_state_.x(QS::POSZ) = 3;
@@ -119,12 +120,12 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
   //############################################################################
   //###################### Dynamic Randominzation ##############################
   //############################################################################
-  YAML::Node cfg_ = YAML::LoadFile(getenv("FlightLxx_PATH") + std::string("/libs/config/rl_env.yaml"));
-  QuadrotorDynamics dynamics;
-  dynamics.updateParams(cfg_);
-  dynamics.dynamicRandomization();
-  dynamics.showQuadrotorDynamicsParams();
-  quadrotor_ptr_->updateDynamics(dynamics);
+  // YAML::Node cfg_ = YAML::LoadFile(getenv("FlightLxx_PATH") + std::string("/libs/config/rl_env.yaml"));
+  // QuadrotorDynamics dynamics;
+  // dynamics.updateParams(cfg_);
+  // dynamics.dynamicRandomization();
+  // dynamics.showQuadrotorDynamicsParams();
+  // quadrotor_ptr_->updateDynamics(dynamics);
   //############################################################################
   //############################################################################
   //############################################################################
@@ -168,7 +169,7 @@ Scalar QuadrotorEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
   //############################################################################
 
   d_before_ = (quad_state_.p - target_pos_).norm();
-  postion_before_ = quad_state_.p;
+  position_before_ = quad_state_.p;
 
   // simulate quadrotor
   quadrotor_ptr_->run(cmd_, sim_dt_);
@@ -177,8 +178,8 @@ Scalar QuadrotorEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
   getObs(obs);
 
   d_after_ = (quad_state_.p - target_pos_).norm();
-  postion_after_ = quad_state_.p;
-  distance_to_target_position_ = distanceToSegment(postion_before_, postion_after_, target_pos_);
+  position_after_ = quad_state_.p;
+  distance_to_target_position_ = distanceToSegment(position_before_, position_after_, target_pos_);
   // std::cout << "distance_to_target_position: " << distance_to_target_position_ << std::endl;
 
   Matrix<3, 3> rot = quad_state_.q().toRotationMatrix();
@@ -213,11 +214,15 @@ Scalar QuadrotorEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
 
   Scalar total_reward = 0.0;
   
-  if (distance_to_target_position_ <= 1.0) {
-    total_reward = d_coeff_ * ( - d_after_ - d_before_) + ang_vel_reward;
+  if ((position_after_ - target_pos_).dot(position_initial_ - target_pos_) <= 0.0) {
+    // total_reward = 1 / (distance_to_target_position_ + 0.01);
+    total_reward = 0;
   }else{
     total_reward = d_coeff_ * (d_after_ - d_before_) + ang_vel_reward;
   }
+
+  // std::cout << "total_reawad:" << total_reward << std::endl;
+  // std::cout << "distance_to_target_position:" << distance_to_target_position_ << std::endl;
 
   // // survival reward
   // total_reward += 0.1;
@@ -236,7 +241,8 @@ bool QuadrotorEnv::isTerminalState(Scalar &reward) {
     reward = 0.0;
     return true;
   }
-  if (distance_to_target_position_ <= 1.0) {
+  if ((position_after_ - target_pos_).dot(position_initial_ - target_pos_) <= 0.0) {
+  // if (distance_to_target_position_ <= 1.0) {
     reward = 0.0;
     return true;
   }
