@@ -69,7 +69,10 @@ class QuadrotorEnv final : public EnvBase {
  private:
   // quadrotor
   std::shared_ptr<Quadrotor> quadrotor_ptr_;
+  std::shared_ptr<Quadrotor> target_quadrotor_ptr_;
+  std::shared_ptr<Quadrotor> std_quadrotor_ptr_;
   QuadState quad_state_;
+  QuadState target_quad_state_;
   Command cmd_;
   Logger logger_{"QaudrotorEnv"};
 

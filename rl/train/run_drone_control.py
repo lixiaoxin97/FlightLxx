@@ -38,7 +38,7 @@ def parser():
                         help="Directory where to save the checkpoints and training metrics")
     parser.add_argument('--seed', type=int, default=0,
                         help="Random seed")
-    parser.add_argument('-w', '--weight', type=str, default='./LQFF_20.zip',
+    parser.add_argument('-w', '--weight', type=str, default='./LQFF_22.zip',
                         help='trained weight path')
     return parser
 
@@ -105,7 +105,7 @@ def main():
         # 2000000000 is 4000 iterations.
         logger.configure(folder=saver.data_dir)
         model.learn(
-            total_timesteps=int(1000000000),
+            total_timesteps=int(250000000),
             log_dir=saver.data_dir, logger=logger)
         model.save(saver.data_dir)
         #########################################################################

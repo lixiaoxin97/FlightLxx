@@ -54,6 +54,20 @@ QuadrotorEnv::QuadrotorEnv(const std::string &cfg_path)
 
   // load parameters
   loadParam(cfg_);
+
+  // target quadrotor
+  target_quadrotor_ptr_ = std::make_shared<Quadrotor>();
+  QuadState target_quad_state_0;
+  target_quad_state_0.setZero();
+  target_quad_state_0.x(QS::POSZ) = 10.0;
+  target_quadrotor_ptr_->setState(target_quad_state_0);
+
+  std_quadrotor_ptr_ = std::make_shared<Quadrotor>();
+  QuadState std_quad_state_0;
+  std_quad_state_0.setZero();
+  std_quad_state_0.x(QS::POSZ) = 10.0;
+  std_quad_state_0.x(QS::POSX) = 4.0;
+  std_quadrotor_ptr_->setState(std_quad_state_0);
 }
 
 QuadrotorEnv::~QuadrotorEnv() {}
@@ -69,9 +83,9 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
     //################################ State #####################################
     // | P | Q | V | W |
     // reset position #############################################
-    quad_state_.x(QS::POSX) = uniform_dist_(random_gen_) * 20;
-    quad_state_.x(QS::POSY) = uniform_dist_(random_gen_) * 20;
-    quad_state_.x(QS::POSZ) = uniform_dist_(random_gen_) * 5 + 10;
+    quad_state_.x(QS::POSX) = 20;
+    quad_state_.x(QS::POSY) = 20;
+    quad_state_.x(QS::POSZ) = 5;
     if (quad_state_.x(QS::POSZ) < -0.0)
       quad_state_.x(QS::POSZ) = -quad_state_.x(QS::POSZ);
     position_initial_ = quad_state_.p;
@@ -81,30 +95,30 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
     // if (quad_state_.x(QS::POSZ) < -0.0)
     //   quad_state_.x(QS::POSZ) = -quad_state_.x(QS::POSZ);
     // reset linear velocity ######################################
-    quad_state_.x(QS::VELX) = uniform_dist_(random_gen_);
-    quad_state_.x(QS::VELY) = uniform_dist_(random_gen_);
-    quad_state_.x(QS::VELZ) = uniform_dist_(random_gen_);
-    // quad_state_.x(QS::VELX) = 0;
-    // quad_state_.x(QS::VELY) = 0;
-    // quad_state_.x(QS::VELZ) = 0;
+    // quad_state_.x(QS::VELX) = uniform_dist_(random_gen_);
+    // quad_state_.x(QS::VELY) = uniform_dist_(random_gen_);
+    // quad_state_.x(QS::VELZ) = uniform_dist_(random_gen_);
+    quad_state_.x(QS::VELX) = 0;
+    quad_state_.x(QS::VELY) = 0;
+    quad_state_.x(QS::VELZ) = 0;
     // reset orientation ##########################################
-    quad_state_.x(QS::ATTW) = uniform_dist_(random_gen_);
-    quad_state_.x(QS::ATTX) = uniform_dist_(random_gen_);
-    quad_state_.x(QS::ATTY) = uniform_dist_(random_gen_);
-    quad_state_.x(QS::ATTZ) = uniform_dist_(random_gen_);
-    quad_state_.qx /= quad_state_.qx.norm();
-    // quad_state_.x(QS::ATTW) = 1;
-    // quad_state_.x(QS::ATTX) = 0;
-    // quad_state_.x(QS::ATTY) = 0;
-    // quad_state_.x(QS::ATTZ) = 0;
+    // quad_state_.x(QS::ATTW) = uniform_dist_(random_gen_);
+    // quad_state_.x(QS::ATTX) = uniform_dist_(random_gen_);
+    // quad_state_.x(QS::ATTY) = uniform_dist_(random_gen_);
+    // quad_state_.x(QS::ATTZ) = uniform_dist_(random_gen_);
     // quad_state_.qx /= quad_state_.qx.norm();
+    quad_state_.x(QS::ATTW) = 1;
+    quad_state_.x(QS::ATTX) = 0;
+    quad_state_.x(QS::ATTY) = 0;
+    quad_state_.x(QS::ATTZ) = 0;
+    quad_state_.qx /= quad_state_.qx.norm();
     // reset body rate ############################################
-    quad_state_.x(QS::OMEX) = uniform_dist_(random_gen_);
-    quad_state_.x(QS::OMEY) = uniform_dist_(random_gen_);
-    quad_state_.x(QS::OMEZ) = uniform_dist_(random_gen_);
-    // quad_state_.x(QS::OMEX) = 0;
-    // quad_state_.x(QS::OMEY) = 0;
-    // quad_state_.x(QS::OMEZ) = 0;
+    // quad_state_.x(QS::OMEX) = uniform_dist_(random_gen_);
+    // quad_state_.x(QS::OMEY) = uniform_dist_(random_gen_);
+    // quad_state_.x(QS::OMEZ) = uniform_dist_(random_gen_);
+    quad_state_.x(QS::OMEX) = 0;
+    quad_state_.x(QS::OMEY) = 0;
+    quad_state_.x(QS::OMEZ) = 0;
     // reset target position ######################################
     target_pos_(0) = 0;
     target_pos_(1) = 0;
@@ -147,10 +161,14 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
 
 bool QuadrotorEnv::getObs(Ref<Vector<>> obs) {
   quadrotor_ptr_->getState(&quad_state_);
+  target_quadrotor_ptr_->getState(&target_quad_state_);
 
   // convert quaternion to euler angle
   Vector<3> euler_zyx = quad_state_.q().toRotationMatrix().eulerAngles(2, 1, 0);
   // quaternionToEuler(quad_state_.q(), euler);
+  target_pos_(0) = target_quad_state_.x(QS::POSX);
+  target_pos_(1) = target_quad_state_.x(QS::POSY);
+  target_pos_(2) = target_quad_state_.x(QS::POSZ);
   quad_obs_ << quad_state_.p - target_pos_, euler_zyx, quad_state_.v, quad_state_.w;
 
   obs.segment<quadenv::kNObs>(quadenv::kObs) = quad_obs_;
@@ -173,6 +191,14 @@ Scalar QuadrotorEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
 
   // simulate quadrotor
   quadrotor_ptr_->run(cmd_, sim_dt_);
+  
+  // simulate target quadrotor
+  QuadState target_quad_state_1;
+  target_quad_state_1.setZero();
+  target_quad_state_1.x(QS::POSX) = cmd_.t * 2.0;
+  target_quad_state_1.x(QS::POSY) = 0.0;
+  target_quad_state_1.x(QS::POSZ) = 10.0;
+  target_quadrotor_ptr_->setState(target_quad_state_1);
 
   // update observations
   getObs(obs);
@@ -289,6 +315,9 @@ bool QuadrotorEnv::getAct(Command *const cmd) const {
 
 void QuadrotorEnv::addObjectsToUnity(std::shared_ptr<UnityBridge> bridge) {
   bridge->addQuadrotor(quadrotor_ptr_);
+  bridge->addQuadrotor(std_quadrotor_ptr_);
+  bridge->addQuadrotor(target_quadrotor_ptr_);
+  
 }
 
 std::ostream &operator<<(std::ostream &os, const QuadrotorEnv &quad_env) {
