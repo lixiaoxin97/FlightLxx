@@ -69,33 +69,16 @@ class QuadrotorEnv final : public EnvBase {
  private:
   // quadrotor
   std::shared_ptr<Quadrotor> quadrotor_ptr_;
-  std::shared_ptr<Quadrotor> target_quadrotor_ptr_;
-  std::shared_ptr<Quadrotor> std_quadrotor_ptr_;
   QuadState quad_state_;
-  QuadState target_quad_state_;
   Command cmd_;
   Logger logger_{"QaudrotorEnv"};
 
   // Define reward for training
   Scalar pos_coeff_, ori_coeff_, lin_vel_coeff_, ang_vel_coeff_, act_coeff_;
 
-  // target position
-  Vector<3> target_pos_;
-
-  // postion before and after, distance to target_position
-  Vector<3> position_before_;
-  Vector<3> position_after_;
-  Scalar distance_to_target_position_;
-
-  // distance before and after , coefficient
-  Scalar d_before_, d_after_, d_coeff_;
-
   // observations and actions (for RL)
   Vector<quadenv::kNObs> quad_obs_;
   Vector<quadenv::kNAct> quad_act_;
-
-  // initial position
-  Vector<3> position_initial_;
 
   // reward function design (for model-free reinforcement learning)
   Vector<quadenv::kNObs> goal_state_;
@@ -109,9 +92,5 @@ class QuadrotorEnv final : public EnvBase {
   YAML::Node cfg_;
   Matrix<3, 2> world_box_;
 };
-
-Scalar distanceToSegment(const Vector<3>& A, 
-                        const Vector<3>& B,
-                        const Vector<3>& P);
 
 }  // namespace flightlib
