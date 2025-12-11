@@ -6,6 +6,12 @@ from scipy.spatial.transform import Rotation as R
 
 
 def lqah_test_model(env, model_1, model_2, model_3, model_4, render=False):
+    
+    #
+    # plt.rcParams['font.family'] = 'Times New Roman'
+    # plt.rcParams['text.usetex'] = True
+    # plt.rcParams['font.size'] = 14
+    
     #
     fig = plt.figure(figsize=(18, 12), tight_layout=True)
     gs = gridspec.GridSpec(5, 12)
@@ -13,6 +19,7 @@ def lqah_test_model(env, model_1, model_2, model_3, model_4, render=False):
     ax_x = fig.add_subplot(gs[0, 0:4])
     ax_x.set_xlabel('t(s)')
     ax_x.set_ylabel('pos_x(m)')
+    # ax_x.set_ylabel(r'$p_x$(m)')
     ax_y = fig.add_subplot(gs[0, 4:8])
     ax_y.set_xlabel('t(s)')
     ax_y.set_ylabel('pos_y(m)')
@@ -115,28 +122,28 @@ def lqah_test_model(env, model_1, model_2, model_3, model_4, render=False):
         ax_y.step(t * 0.02, pos[:, 1], color="C{0}".format(
             1), label="trail: {0}".format(1))
         ax_z.step(t * 0.02, pos[:, 2], color="C{0}".format(
-            11), label="position -- BL".format(1))
+            1), label="BL".format(1))
         #
         ax_dx.step(t * 0.02, dpos[:, 0], color="C{0}".format(
             1), label="trail: {0}".format(1))
         ax_dy.step(t * 0.02, dpos[:, 1], color="C{0}".format(
             1), label="trail: {0}".format(1))
         ax_dz.step(t * 0.02, dpos[:, 2], color="C{0}".format(
-            1), label="velocity -- BL".format(1))
+            1), label="BL".format(1))
         #
         ax_euler_x.step(t * 0.02, euler[:, -1], color="C{0}".format(
             1), label="trail: {0}".format(1))
         ax_euler_y.step(t * 0.02, euler[:, 0], color="C{0}".format(
             1), label="trail :{0}".format(1))
         ax_euler_z.step(t * 0.02, euler[:, 1], color="C{0}".format(
-            1), label="orientation -- BL".format(1))
+            1), label="BL".format(1))
         #
         ax_euler_vx.step(t * 0.02, deuler[:, 0], color="C{0}".format(
             1), label="trail: {0}".format(1))
         ax_euler_vy.step(t * 0.02, deuler[:, 1], color="C{0}".format(
             1), label="trail :{0}".format(1))
         ax_euler_vz.step(t * 0.02, deuler[:, 2], color="C{0}".format(
-            1), label="bodyrate -- BL".format(1))
+            1), label="BL".format(1))
         #
         ax_action0.step(t * 0.02, actions[:, 0] * 2 * 3.1415926 , color="C{0}".format(
             1), label="trail: {0}".format(1))
@@ -145,7 +152,7 @@ def lqah_test_model(env, model_1, model_2, model_3, model_4, render=False):
         ax_action2.step(t * 0.02, actions[:, 2] * 1 * 3.1415926 , color="C{0}".format(
             1), label="trail: {0}".format(1))
         ax_action3.step(t * 0.02, actions[:, 0] * 9.81 + 9.81 , color="C{0}".format(
-            1), label="action -- BL".format(1))
+            1), label="BL".format(1))
 
 
 
@@ -195,28 +202,28 @@ def lqah_test_model(env, model_1, model_2, model_3, model_4, render=False):
         ax_y.step(t * 0.02, pos[:, 1], color="C{0}".format(
             2), label="trail: {0}".format(2))
         ax_z.step(t * 0.02, pos[:, 2], color="C{0}".format(
-            2), label="position -- GA".format(2))
+            2), label="GA".format(2))
         #
         ax_dx.step(t * 0.02, dpos[:, 0], color="C{0}".format(
             2), label="trail: {0}".format(2))
         ax_dy.step(t * 0.02, dpos[:, 1], color="C{0}".format(
             2), label="trail: {0}".format(2))
         ax_dz.step(t * 0.02, dpos[:, 2], color="C{0}".format(
-            2), label="velocity -- GA".format(2))
+            2), label="GA".format(2))
         #
         ax_euler_x.step(t * 0.02, euler[:, -1], color="C{0}".format(
             2), label="trail: {0}".format(2))
         ax_euler_y.step(t * 0.02, euler[:, 0], color="C{0}".format(
             2), label="trail :{0}".format(2))
         ax_euler_z.step(t * 0.02, euler[:, 1], color="C{0}".format(
-            2), label="orientation -- GA".format(2))
+            2), label="GA".format(2))
         #
         ax_euler_vx.step(t * 0.02, deuler[:, 0], color="C{0}".format(
             2), label="trail: {0}".format(2))
         ax_euler_vy.step(t * 0.02, deuler[:, 1], color="C{0}".format(
             2), label="trail :{0}".format(2))
         ax_euler_vz.step(t * 0.02, deuler[:, 2], color="C{0}".format(
-            2), label="bodyrate -- GA".format(2))
+            2), label="GA".format(2))
         #
         ax_action0.step(t * 0.02, actions[:, 0] * 2 * 3.1415926 , color="C{0}".format(
             2), label="trail: {0}".format(2))
@@ -225,7 +232,7 @@ def lqah_test_model(env, model_1, model_2, model_3, model_4, render=False):
         ax_action2.step(t * 0.02, actions[:, 2] * 1 * 3.1415926 , color="C{0}".format(
             2), label="trail: {0}".format(2))
         ax_action3.step(t * 0.02, actions[:, 0] * 9.81 + 9.81 , color="C{0}".format(
-            2), label="action -- GA".format(2))
+            2), label="GA".format(2))
         
 
 
@@ -276,28 +283,28 @@ def lqah_test_model(env, model_1, model_2, model_3, model_4, render=False):
         ax_y.step(t * 0.02, pos[:, 1], color="C{0}".format(
             3), label="trail: {0}".format(3))
         ax_z.step(t * 0.02, pos[:, 2], color="C{0}".format(
-            3), label="position -- DR".format(3))
+            3), label="DR".format(3))
         #
         ax_dx.step(t * 0.02, dpos[:, 0], color="C{0}".format(
             3), label="trail: {0}".format(3))
         ax_dy.step(t * 0.02, dpos[:, 1], color="C{0}".format(
             3), label="trail: {0}".format(3))
         ax_dz.step(t * 0.02, dpos[:, 2], color="C{0}".format(
-            3), label="velocity -- DR".format(3))
+            3), label="DR".format(3))
         #
         ax_euler_x.step(t * 0.02, euler[:, -1], color="C{0}".format(
             3), label="trail: {0}".format(3))
         ax_euler_y.step(t * 0.02, euler[:, 0], color="C{0}".format(
             3), label="trail :{0}".format(3))
         ax_euler_z.step(t * 0.02, euler[:, 1], color="C{0}".format(
-            3), label="orientation -- DR".format(3))
+            3), label="DR".format(3))
         #
         ax_euler_vx.step(t * 0.02, deuler[:, 0], color="C{0}".format(
             3), label="trail: {0}".format(3))
         ax_euler_vy.step(t * 0.02, deuler[:, 1], color="C{0}".format(
             3), label="trail :{0}".format(3))
         ax_euler_vz.step(t * 0.02, deuler[:, 2], color="C{0}".format(
-            3), label="bodyrate -- DR".format(3))
+            3), label="DR".format(3))
         #
         ax_action0.step(t * 0.02, actions[:, 0] * 2 * 3.1415926 , color="C{0}".format(
             3), label="trail: {0}".format(3))
@@ -306,7 +313,7 @@ def lqah_test_model(env, model_1, model_2, model_3, model_4, render=False):
         ax_action2.step(t * 0.02, actions[:, 2] * 1 * 3.1415926 , color="C{0}".format(
             3), label="trail: {0}".format(3))
         ax_action3.step(t * 0.02, actions[:, 0] * 9.81 + 9.81 , color="C{0}".format(
-            3), label="action -- DR".format(3))
+            3), label="DR".format(3))
 
 
 
@@ -357,28 +364,28 @@ def lqah_test_model(env, model_1, model_2, model_3, model_4, render=False):
         ax_y.step(t * 0.02, pos[:, 1], color="C{0}".format(
             4), label="trail: {0}".format(4))
         ax_z.step(t * 0.02, pos[:, 2], color="C{0}".format(
-            4), label="position -- OK".format(4))
+            4), label="OK".format(4))
         #
         ax_dx.step(t * 0.02, dpos[:, 0], color="C{0}".format(
             4), label="trail: {0}".format(4))
         ax_dy.step(t * 0.02, dpos[:, 1], color="C{0}".format(
             4), label="trail: {0}".format(4))
         ax_dz.step(t * 0.02, dpos[:, 2], color="C{0}".format(
-            4), label="velocity -- OK".format(4))
+            4), label="OK".format(4))
         #
         ax_euler_x.step(t * 0.02, euler[:, -1], color="C{0}".format(
             4), label="trail: {0}".format(4))
         ax_euler_y.step(t * 0.02, euler[:, 0], color="C{0}".format(
             4), label="trail :{0}".format(4))
         ax_euler_z.step(t * 0.02, euler[:, 1], color="C{0}".format(
-            4), label="orientation -- OK".format(4))
+            4), label="OK".format(4))
         #
         ax_euler_vx.step(t * 0.02, deuler[:, 0], color="C{0}".format(
             4), label="trail: {0}".format(4))
         ax_euler_vy.step(t * 0.02, deuler[:, 1], color="C{0}".format(
             4), label="trail :{0}".format(4))
         ax_euler_vz.step(t * 0.02, deuler[:, 2], color="C{0}".format(
-            4), label="bodyrate -- OK".format(4))
+            4), label="OK".format(4))
         #
         ax_action0.step(t * 0.02, actions[:, 0] * 2 * 3.1415926 , color="C{0}".format(
             4), label="trail: {0}".format(4))
@@ -387,7 +394,7 @@ def lqah_test_model(env, model_1, model_2, model_3, model_4, render=False):
         ax_action2.step(t * 0.02, actions[:, 2] * 1 * 3.1415926 , color="C{0}".format(
             4), label="trail: {0}".format(4))
         ax_action3.step(t * 0.02, actions[:, 0] * 9.81 + 9.81 , color="C{0}".format(
-            4), label="action -- OK".format(4))
+            4), label="OK".format(4))
 
 
 

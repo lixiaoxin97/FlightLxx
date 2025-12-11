@@ -90,19 +90,19 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
     //############################################################################
     //################################ Experiments ###############################
     // reset position
-    quad_state_.x(QS::POSX) = 0;
+    quad_state_.x(QS::POSX) = 0.5;
     quad_state_.x(QS::POSY) = 0;
     quad_state_.x(QS::POSZ) = 5;
     if (quad_state_.x(QS::POSZ) < -0.0)
       quad_state_.x(QS::POSZ) = -quad_state_.x(QS::POSZ);
     // reset linear velocity
-    quad_state_.x(QS::VELX) = 1;
-    quad_state_.x(QS::VELY) = 0;
+    quad_state_.x(QS::VELX) = 0;
+    quad_state_.x(QS::VELY) = 1;
     quad_state_.x(QS::VELZ) = 0;
     // reset orientation
-    quad_state_.x(QS::ATTW) = 0;
-    quad_state_.x(QS::ATTX) = 1;
-    quad_state_.x(QS::ATTY) = 0;
+    quad_state_.x(QS::ATTW) = 0.7071068;
+    quad_state_.x(QS::ATTX) = 0;
+    quad_state_.x(QS::ATTY) = 0.7071068;
     quad_state_.x(QS::ATTZ) = 0;
     quad_state_.qx /= quad_state_.qx.norm();
     // reset body rate
