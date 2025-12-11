@@ -23,11 +23,11 @@ QuadrotorEnv::QuadrotorEnv(const std::string &cfg_path)
   
   //###################### Dynamic Randominzation ##############################
   //############################################################################
-  // // update dynamics
-  // QuadrotorDynamics dynamics;
-  // dynamics.updateParams(cfg_);
-  // dynamics.showQuadrotorDynamicsParams();
-  // quadrotor_ptr_->updateDynamics(dynamics);
+  // update dynamics
+  QuadrotorDynamics dynamics;
+  dynamics.updateParams(cfg_);
+  dynamics.showQuadrotorDynamicsParams();
+  quadrotor_ptr_->updateDynamics(dynamics);
   //############################################################################
 
   // define a bounding box
@@ -94,12 +94,12 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
   //############################################################################
   //###################### Dynamic Randominzation ##############################
   //############################################################################
-  YAML::Node cfg_ = YAML::LoadFile(getenv("FlightLxx_PATH") + std::string("/libs/config/rl_env.yaml"));
-  QuadrotorDynamics dynamics;
-  dynamics.updateParams(cfg_);
-  dynamics.dynamicRandomization();
-  dynamics.showQuadrotorDynamicsParams();
-  quadrotor_ptr_->updateDynamics(dynamics);
+  // YAML::Node cfg_ = YAML::LoadFile(getenv("FlightLxx_PATH") + std::string("/libs/config/rl_env.yaml"));
+  // QuadrotorDynamics dynamics;
+  // dynamics.updateParams(cfg_);
+  // dynamics.dynamicRandomization();
+  // dynamics.showQuadrotorDynamicsParams();
+  // quadrotor_ptr_->updateDynamics(dynamics);
   //############################################################################
   //############################################################################
   //############################################################################
