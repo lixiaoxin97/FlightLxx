@@ -93,13 +93,13 @@ class Quadrotor : ObjectBase {
 
 
   // Experiment1
-  const Matrix<3, 3> Kinv_ang_vel_tau_ =Vector<3>(16.6, 16.6, 5.0).asDiagonal();
+  // const Matrix<3, 3> Kinv_ang_vel_tau_ =Vector<3>(16.6, 16.6, 5.0).asDiagonal();
 
   // Experiment2
-  // const Matrix<3, 3> Kinv_ang_vel_tau_ =Vector<3>(16.6, 16.6, 5.0).asDiagonal();
-  
+  // const Matrix<3, 3> Kinv_ang_vel_tau_ =Vector<3>(45, 45, 60).asDiagonal();
+
   // Experiment3
-  // const Matrix<3, 3> Kinv_ang_vel_tau_ =Vector<3>(16.6, 16.6, 5.0).asDiagonal();
+  const Matrix<3, 3> Kinv_ang_vel_tau_ =Vector<3>(200, 200, 120).asDiagonal();
 
 
   //############################################################################
