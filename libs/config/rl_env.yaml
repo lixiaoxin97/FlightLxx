@@ -17,6 +17,7 @@ quadrotor_dynamics:
   kappa: 0.01 # rotor drag coeff
   omega_max: [6.2831852, 6.2831852, 3.1415926]  # body rate constraint (x, y, z) 
   inertia: [0.0023, 0.0023, 0.0036]
+  #P_rate:(16.6, 16.6, 5.0)
 ######################################################################################
 ################################### Experiments2 #####################################
 # | mass | arm_l | motor_tau | motor_omega_min | motor_omega_max | thrust_map | kappa | omega_max |
@@ -30,6 +31,7 @@ quadrotor_dynamics:
 #   kappa: 0.06 # rotor drag coeff
 #   omega_max: [6.2831852, 6.2831852, 3.1415926]  # body rate constraint (x, y, z) 
 #   inertia: [0.029125, 0.029125, 0.055225]
+#   #P_rate:(16.6, 16.6, 5.0)
 ######################################################################################
 ################################### Experiments3 #####################################
 # | mass | arm_l | motor_tau | motor_omega_min | motor_omega_max | thrust_map | kappa | omega_max |
@@ -43,6 +45,7 @@ quadrotor_dynamics:
 #   kappa: 0.005964552 # rotor drag coeff
 #   omega_max: [6.2831852, 6.2831852, 3.1415926]  # body rate constraint (x, y, z) 
 #   inertia: [1.6571710e-05, 1.6655602e-05, 2.9261652e-05]
+#   #P_rate:(16.6, 16.6, 5.0)
 ######################################################################################
 ######################################################################################
 

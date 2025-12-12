@@ -90,7 +90,18 @@ class Quadrotor : ObjectBase {
   //############################################################################
   //############################## Environment #################################
   // | P_rate |
+
+
+  // Experiment1
   const Matrix<3, 3> Kinv_ang_vel_tau_ =Vector<3>(16.6, 16.6, 5.0).asDiagonal();
+
+  // Experiment2
+  // const Matrix<3, 3> Kinv_ang_vel_tau_ =Vector<3>(16.6, 16.6, 5.0).asDiagonal();
+  
+  // Experiment3
+  // const Matrix<3, 3> Kinv_ang_vel_tau_ =Vector<3>(16.6, 16.6, 5.0).asDiagonal();
+
+
   //############################################################################
   //############################################################################
   // gravity
