@@ -185,6 +185,11 @@ bool QuadrotorDynamics::updateParams(const YAML::Node& params) {
       params["quadrotor_dynamics"]["omega_max"].as<std::vector<Scalar>>();
     omega_max_ = Map<Vector<3>>(omega_max.data());
 
+    std::vector<Scalar> inertia;
+    inertia =
+      params["quadrotor_dynamics"]["inertia"].as<std::vector<Scalar>>();
+    inertia_ = Map<Vector<3>>(inertia.data());
+
     // update relevant variables
     thrust_min_ = 0.0;
     thrust_max_ = motor_omega_max_ * motor_omega_max_ * thrust_map_(0) + motor_omega_max_ * thrust_map_(1) + thrust_map_(2);
@@ -224,7 +229,10 @@ bool QuadrotorDynamics::updateInertiaMarix() {
   //############################################################################
   //############################## Environment #################################
   // | J |
-  J_ = mass_ / 24.0 * arm_l_ * arm_l_ * Vector<3>(4.5, 4.5, 7).asDiagonal();
+  // J_ = mass_ / 24.0 * arm_l_ * arm_l_ * Vector<3>(4.5, 4.5, 7).asDiagonal();
+
+  J_ = inertia_.asDiagonal();
+
   //############################################################################
   //############################################################################
   J_inv_ = J_.inverse();

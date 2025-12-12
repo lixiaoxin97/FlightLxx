@@ -70,6 +70,8 @@ class QuadrotorDynamics : DynamicsBase {
   Matrix<3, 3> J_;
   Matrix<3, 3> J_inv_;
 
+  Vector<3> inertia_;
+
   // motors
   Scalar motor_omega_min_;
   Scalar motor_omega_max_;

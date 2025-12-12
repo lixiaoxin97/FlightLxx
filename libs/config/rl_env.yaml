@@ -5,7 +5,7 @@ quadrotor_env:
    add_camera: yes
 
 ######################################################################################
-################################### Environment ######################################
+################################### Experiments1 #####################################
 # | mass | arm_l | motor_tau | motor_omega_min | motor_omega_max | thrust_map | kappa | omega_max |
 quadrotor_dynamics:
   mass: 0.78
@@ -16,6 +16,33 @@ quadrotor_dynamics:
   thrust_map: [1.8495740127948213e-08, -7.055596047224982e-05, 6.546158341970494e-02]
   kappa: 0.01 # rotor drag coeff
   omega_max: [6.2831852, 6.2831852, 3.1415926]  # body rate constraint (x, y, z) 
+  inertia: [0.0023, 0.0023, 0.0036]
+######################################################################################
+################################### Experiments2 #####################################
+# | mass | arm_l | motor_tau | motor_omega_min | motor_omega_max | thrust_map | kappa | omega_max |
+# quadrotor_dynamics:
+#   mass: 1.5
+#   arm_l: 0.247
+#   motor_omega_min: 0.0 # motor rpm min
+#   motor_omega_max: 10505.0 # motor rpm max
+#   motor_tau: 0.01875 # motor step response
+#   thrust_map: [5.84e-06, 0.0, 0.0]
+#   kappa: 0.06 # rotor drag coeff
+#   omega_max: [6.2831852, 6.2831852, 3.1415926]  # body rate constraint (x, y, z) 
+#   inertia: [0.029125, 0.029125, 0.055225]
+######################################################################################
+################################### Experiments3 #####################################
+# | mass | arm_l | motor_tau | motor_omega_min | motor_omega_max | thrust_map | kappa | omega_max |
+# quadrotor_dynamics:
+#   mass: 0.028
+#   arm_l: 0.044
+#   motor_omega_min: 0.0 # motor rpm min
+#   motor_omega_max: 25000.0 # motor rpm max
+#   motor_tau: 0.0001 # motor step response
+#   thrust_map: [1.28192e-08, 0.0, 0.0]
+#   kappa: 0.005964552 # rotor drag coeff
+#   omega_max: [6.2831852, 6.2831852, 3.1415926]  # body rate constraint (x, y, z) 
+#   inertia: [1.6571710e-05, 1.6655602e-05, 2.9261652e-05]
 ######################################################################################
 ######################################################################################
 
