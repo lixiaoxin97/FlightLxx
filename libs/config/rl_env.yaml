@@ -1,23 +1,157 @@
 quadrotor_env:
    camera: no
    sim_dt: 0.02 
-   max_t: 10.0
+   max_t: 45.0
    add_camera: yes
 
 quadrotor_dynamics:
   mass: 0.78
   arm_l: 0.125
-  motor_omega_min: -29400.0 # motor rpm min
-  motor_omega_max: 29400.0 # motor rpm max
-  motor_tau: 0.033 # motor step response
-  thrust_map_p: [ 1.58536769e-08, 0.0, 0.0]
-  thrust_map_n: [-1.58536769e-08, 0.0, 0.0]
-  kappa: 0.01 # rotor drag coeff
+  # Identified from rotor_data/ black-prop tests on 2026-04-24.
+  # Units are RPM and Newtons: thrust = a * rpm^2 + b * rpm + c.
+  motor_omega_min: -28000.0 # measured reverse max rpm
+  motor_omega_max: 28500.0 # measured positive max rpm
+  motor_tau: 0.045 # fitted 10-90% motor/reversal rise time / 2.2
+  motor_reversal_dead_time: 0.09 # neutral no-thrust window when changing sign
+  motor_deadzone_omega: 1200.0 # small idle/zero-thrust rpm band
+  thrust_map_p: [ 1.1775e-08, 0.0, 0.0]
+  thrust_map_n: [-1.1083e-08, 0.0, 0.0]
+  kappa: 0.0118 # measured propeller reaction torque / thrust
   omega_max: [6.2831852, 6.2831852, 3.1415926]  # body rate constraint (x, y, z) 
 
-rl:
-  pos_coeff: -0.02        # reward coefficient for position 
-  ori_coeff: -0.02        # reward coefficient for orientation
-  lin_vel_coeff: -0.0002   # reward coefficient for linear velocity
-  ang_vel_coeff: -0.0002   # reward coefficient for angular velocity
-  act_coeff: 0.00  # reward coefficient for control actions
+path_following:
+  path_mode: default
+  base_z: 5.0
+  initial_length: 18.0
+  min_length: 10.0
+  max_length: 20.0
+  # Used only as the nominal initial forward velocity at reset.
+  initial_speed: 1.0
+  min_speed: 0.6
+  max_speed: 3.0
+  initial_lateral_amp: 0.0
+  initial_vertical_amp: 0.0
+  max_lateral_amp: 5.0
+  max_vertical_amp: 4.0
+  initial_wave_count: 1.0
+  min_wave_count: 0.5
+  max_wave_count: 3.0
+  initial_shape_mix: 0.0
+  max_shape_mix: 1.0
+  lookahead_distance: 0.5
+  path_samples: 201
+  max_tracking_error: 5.0
+  finish_margin: 0.5
+  finish_error: 1.0
+  closest_search_backward: 1.0
+  closest_search_forward: 3.0
+  checkpoint_count: 8
+  checkpoint_radius: 0.8
+  figure_eight_length: 18.0
+  figure_eight_radius: 5.0
+  figure_eight_vertical_amp: 3.0
+  figure_eight_speed: 1.0
+  reset:
+    progress_range: 1.0
+    position_xy_noise: 0.50
+    position_z_noise: 0.25
+    forward_speed_noise: 0.20
+    lateral_speed_noise: 0.20
+    vertical_speed_noise: 0.10
+    roll_pitch_noise: 0.12
+    yaw_noise: 0.25
+    body_rate_noise: 0.20
+  reward:
+    # Continuous path-following reward. All error terms are normalized before
+    # multiplying by their coefficients.
+    alive_reward: 0.0
+    advance_coeff: 1.0
+    advance_ref_speed: 1.0
+    track_gate_sigma: 1.0
+    path_coeff: 0.5
+    path_error_scale: 1.0
+    lookahead_coeff: 0.0
+    lookahead_near_distance: 0.4
+    lookahead_improvement_eps: 0.01
+    body_rate_coeff: 0.1
+    body_rate_scale: 4.0
+    act_coeff: 0.04
+    act_delta_scale: 2.0
+    act_second_delta_coeff: 0.02
+    act_second_delta_scale: 2.0
+    thrust_switch_coeff: 0.03
+    reversal_deadzone_coeff: 0.08
+    speed_limit: 2.0
+    speed_coeff: 0.2
+    max_penalty: 4.0
+    progress_coeff: 0.0
+    pass_reward: 0.0
+    crash_penalty: -30.0
+    terminal_penalty: -10.0
+    success_reward: 20.0
+    pos_sigma: 0.60
+
+domain_randomization:
+  enabled: yes
+  # PX4/Kakute H7 + Tekko ESC + Jetson offboard robustness. These are sampled
+  # per episode and are independent of the environment policy.
+  mass_scale: 0.10
+  inertia_scale: 0.15
+  thrust_scale: 0.10
+  negative_thrust_scale: 0.15
+  motor_tau_scale: 0.25
+  motor_reversal_dead_time_scale: 0.40
+  motor_deadzone_omega_scale: 0.30
+  drag_scale: 0.30
+  max_action_delay_steps: 3
+  max_obs_delay_steps: 2
+
+environment_policy:
+  enabled: yes
+  step: 0.08
+  noise: 0.005
+  rank_reward_scale: 1.0
+  lateral_step: 0.10
+  vertical_step: 0.08
+  wave_step: 0.08
+  shape_step: 0.10
+  length_step: 0.20
+  action_clip: 0.25
+  recovery_action: 0.45
+  guard_min_progress: 0.18
+  guard_max_error_ratio: 0.55
+  checkpoint_xy_step: 0.50
+  checkpoint_z_step: 0.25
+  max_checkpoint_x_offset: 18.0
+  max_checkpoint_xy_offset: 4.0
+  max_checkpoint_z_offset: 2.0
+  infeasible_reset_patience: 3
+  reset_min_progress: 0.05
+  infeasible_score_threshold: -25.0
+
+wind:
+  enabled: yes
+  # Wind acts through relative-airflow drag. The policy controls mean, gust,
+  # and burst components, but their combined speed is budgeted so the generated
+  # wind remains within a 12 m/s physical limit.
+  linear_drag: 0.18
+  quadratic_drag: 0.04
+  max_total_speed: 12.0
+  max_mean_norm: 6.0
+  max_gust_norm: 4.0
+  max_burst_norm: 2.0
+  max_mean_xy: 6.0
+  max_mean_z: 6.0
+  max_gust_xy: 4.0
+  max_gust_z: 4.0
+  min_gust_freq: 0.04
+  max_gust_freq: 0.65
+  max_burst_xy: 2.0
+  max_burst_z: 2.0
+  min_burst_duration: 0.35
+  max_burst_duration: 3.0
+  mean_step: 0.45
+  gust_step: 0.30
+  freq_step: 0.06
+  burst_step: 0.25
+  burst_time_step: 0.08

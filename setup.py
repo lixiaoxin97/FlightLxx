@@ -1,6 +1,7 @@
 # copy from https://github.com/pybind/cmake_example/blob/master/setup.py
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -15,6 +16,17 @@ PLAT_TO_CMAKE = {
     "win-arm32": "ARM",
     "win-arm64": "ARM64",
 }
+
+
+def parse_debug_env(value: str) -> bool:
+    value = value.strip().lower()
+    if value in {"", "0", "false", "off", "no", "release"}:
+        return False
+    if value in {"1", "true", "on", "yes", "debug"}:
+        return True
+    raise ValueError(
+        "DEBUG must be one of 0/1, false/true, off/on, no/yes, release/debug"
+    )
 
 
 # A CMakeExtension needs a sourcedir instead of a file list.
@@ -35,7 +47,11 @@ class CMakeBuild(build_ext):
         # Using this requires trailing slash for auto-detection & inclusion of
         # auxiliary "native" libs
 
-        debug = int(os.environ.get("DEBUG", 0)) if self.debug is None else self.debug
+        debug = (
+            parse_debug_env(os.environ.get("DEBUG", "0"))
+            if self.debug is None
+            else self.debug
+        )
         cfg = "Debug" if debug else "Release"
 
         # CMake lets you override the generator - we need to check this.
@@ -50,6 +66,14 @@ class CMakeBuild(build_ext):
             f"-DPYTHON_EXECUTABLE={sys.executable}",
             f"-DCMAKE_BUILD_TYPE={cfg}",  # not used on MSVC, but no harm
         ]
+        try:
+            import pybind11
+
+            cmake_args.append(f"-Dpybind11_DIR={pybind11.get_cmake_dir()}")
+        except ImportError as exc:
+            raise RuntimeError(
+                "pybind11>=2.10.4 is required to build FlightLxx with this Python"
+            ) from exc
         build_args = []
         # Adding CMake arguments set as environment variable
         # (needed e.g. to build for ARM OSx on conda-forge)
@@ -113,6 +137,13 @@ class CMakeBuild(build_ext):
                 build_args += [f"-j{self.parallel}"]
 
         build_temp = Path(self.build_temp) / ext.name
+        cache_file = build_temp / "CMakeCache.txt"
+        if cache_file.exists():
+            cache_text = cache_file.read_text(errors="ignore")
+            expected_home = f"CMAKE_HOME_DIRECTORY:INTERNAL={ext.sourcedir}"
+            if expected_home not in cache_text:
+                shutil.rmtree(build_temp)
+
         if not build_temp.exists():
             build_temp.mkdir(parents=True)
 
@@ -133,12 +164,18 @@ setup(
     author_email="lixiaoxin97@foxmail.com",
     description="FlightLxx: A Quadrotor Simulator for Reinforcement Learning",
     long_description="",
-    ext_modules=[CMakeExtension("FlightLxx")],
+    ext_modules=[CMakeExtension("flightgym")],
     cmdclass={"build_ext": CMakeBuild},
     zip_safe=False,
     extras_require={"test": ["pytest>=6.0"]},
     python_requires=">=3.6",
-    install_requires=['gym==0.11', 'ruamel.yaml==0.16.10',
-                      'numpy==1.22.0', 'stable_baselines==2.10.1'],
+    install_requires=[
+        'gym[atari,classic_control]==0.11',
+        'ruamel.yaml==0.16.10',
+        'numpy==1.22.0; python_version < "3.11"',
+        'numpy>=1.23.5,<2; python_version >= "3.11"',
+        'stable_baselines==2.10.1',
+        'tensorflow>=2.13,<2.14; python_version >= "3.8" and python_version < "3.12"',
+    ],
     packages=['rl.lxx_baselines.ppo', 'rl.lxx_baselines.common', 'rl.lxx_baselines.envs','rl.BidirectionalThrustControl']
 )

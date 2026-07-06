@@ -1,3 +1,10 @@
+import os
+
+import matplotlib
+
+if not os.environ.get("DISPLAY"):
+    matplotlib.use("Agg")
+
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.gridspec as gridspec

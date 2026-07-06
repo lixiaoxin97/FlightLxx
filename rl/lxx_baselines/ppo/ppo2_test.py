@@ -1,3 +1,10 @@
+import os
+
+import matplotlib
+
+if not os.environ.get("DISPLAY"):
+    matplotlib.use("Agg")
+
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.gridspec as gridspec
@@ -29,6 +36,15 @@ def test_model(env, model, render=False):
     ax_action2 = fig.add_subplot(gs[4, 6:9])
     ax_action3 = fig.add_subplot(gs[4, 9:12])
 
+    wind_names = set(getattr(env, "extra_info_names", []))
+    plot_wind = {"wind_x", "wind_y", "wind_z"}.issubset(wind_names)
+    if plot_wind:
+        wind_fig, wind_axes = plt.subplots(4, 1, figsize=(14, 10), sharex=True)
+        wind_fig.suptitle("Wind field during evaluation")
+    else:
+        wind_fig, wind_axes = None, None
+    wind_summaries = []
+
     max_ep_length = env.max_episode_steps
     num_rollouts = 5
     
@@ -37,6 +53,7 @@ def test_model(env, model, render=False):
     for n_roll in range(num_rollouts):
         pos, euler, dpos, deuler = [], [], [], []
         actions = []
+        wind_rows = []
         obs, done, ep_len = env.reset(), False, 0
         while not (done or (ep_len >= max_ep_length)):
             act, _ = model.predict(obs, deterministic=True)
@@ -50,11 +67,29 @@ def test_model(env, model, render=False):
             deuler.append(obs[0, 9:12].tolist())
             #
             actions.append(act[0, :].tolist())
+            if plot_wind:
+                extra = infos[0].get("extra_info", {})
+                wind_rows.append([
+                    extra.get("wind_x", 0.0),
+                    extra.get("wind_y", 0.0),
+                    extra.get("wind_z", 0.0),
+                    extra.get("wind_mean_x", 0.0),
+                    extra.get("wind_mean_y", 0.0),
+                    extra.get("wind_mean_z", 0.0),
+                    extra.get("wind_gust_x", 0.0),
+                    extra.get("wind_gust_y", 0.0),
+                    extra.get("wind_gust_z", 0.0),
+                    extra.get("wind_burst_x", 0.0),
+                    extra.get("wind_burst_y", 0.0),
+                    extra.get("wind_burst_z", 0.0),
+                    extra.get("wind_acc_norm", 0.0),
+                ])
         pos = np.asarray(pos)
         dpos = np.asarray(dpos)
         euler = np.asarray(euler)
         deuler = np.asarray(deuler)
         actions = np.asarray(actions)
+        wind_rows = np.asarray(wind_rows)
         #
         t = np.arange(0, pos.shape[0])
         ax_x.step(t, pos[:, 0], color="C{0}".format(
@@ -93,6 +128,29 @@ def test_model(env, model, render=False):
             n_roll), label="trail: {0}".format(n_roll))
         ax_action3.step(t, actions[:, 3] * 0.78 * 9.81 / 2, color="C{0}".format(
             n_roll), label="act [0, 1, 2, 3] -- trail: {0}".format(n_roll))
+        if plot_wind and wind_rows.size > 0:
+            wind = wind_rows[:, 0:3]
+            mean = wind_rows[:, 3:6]
+            gust = wind_rows[:, 6:9]
+            burst = wind_rows[:, 9:12]
+            wind_acc = wind_rows[:, 12]
+            wind_norm = np.linalg.norm(wind, axis=1)
+            wind_summaries.append((wind_norm.mean(), wind_norm.max(), wind_acc.mean()))
+
+            wind_axes[0].plot(t, wind[:, 0], color="C0", alpha=0.75)
+            wind_axes[0].plot(t, wind[:, 1], color="C1", alpha=0.75)
+            wind_axes[0].plot(t, wind[:, 2], color="C2", alpha=0.75)
+            wind_axes[1].plot(t, mean[:, 0], color="C0", alpha=0.45, linestyle="--")
+            wind_axes[1].plot(t, mean[:, 1], color="C1", alpha=0.45, linestyle="--")
+            wind_axes[1].plot(t, mean[:, 2], color="C2", alpha=0.45, linestyle="--")
+            wind_axes[1].plot(t, gust[:, 0], color="C0", alpha=0.80)
+            wind_axes[1].plot(t, gust[:, 1], color="C1", alpha=0.80)
+            wind_axes[1].plot(t, gust[:, 2], color="C2", alpha=0.80)
+            wind_axes[2].plot(t, burst[:, 0], color="C0", alpha=0.75)
+            wind_axes[2].plot(t, burst[:, 1], color="C1", alpha=0.75)
+            wind_axes[2].plot(t, burst[:, 2], color="C2", alpha=0.75)
+            wind_axes[3].plot(t, wind_norm, color="C3", alpha=0.80)
+            wind_axes[3].plot(t, wind_acc, color="C4", alpha=0.80)
         # P2G
         # ax_action0.step(t, actions[:, 0] * 0.78 * 9.81 / 4 + 0.78 * 9.81 / 4, color="C{0}".format(
         #     n_roll), label="trail: {0}".format(n_roll))
@@ -110,6 +168,23 @@ def test_model(env, model, render=False):
     ax_euler_z.legend()
     ax_euler_vz.legend()
     ax_action3.legend()
+    if plot_wind:
+        wind_axes[0].set_ylabel("wind xyz [m/s]")
+        wind_axes[1].set_ylabel("mean -- / gust [m/s]")
+        wind_axes[2].set_ylabel("burst xyz [m/s]")
+        wind_axes[3].set_ylabel("|wind|, |wind acc|")
+        wind_axes[3].set_xlabel("step")
+        wind_axes[0].legend(["wind x", "wind y", "wind z"], loc="upper right")
+        wind_axes[1].legend(["mean x", "mean y", "mean z",
+                             "gust x", "gust y", "gust z"], loc="upper right")
+        wind_axes[2].legend(["burst x", "burst y", "burst z"], loc="upper right")
+        wind_axes[3].legend(["|wind| [m/s]", "|wind acc| [m/s^2]"],
+                            loc="upper right")
+        wind_fig.tight_layout()
+        if wind_summaries:
+            summaries = np.asarray(wind_summaries)
+            print("[WindTest] mean |wind|={:.2f} m/s, peak |wind|={:.2f} m/s, mean |wind acc|={:.2f} m/s^2".format(
+                summaries[:, 0].mean(), summaries[:, 1].max(), summaries[:, 2].mean()))
     #
     plt.tight_layout()
     plt.show()

@@ -3,10 +3,23 @@ from ruamel.yaml import YAML, dump, RoundTripDumper
 
 #
 import os
+import sys
 import math
 import argparse
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, PROJECT_ROOT)
+os.environ.setdefault("FlightLxx_PATH", PROJECT_ROOT)
+
+from rl.runtime_libs import ensure_libstdcxx_preloaded
+
+ensure_libstdcxx_preloaded()
+
 import numpy as np
 import tensorflow as tf
+from rl.tf_compat import enable_tf1_compat
+
+enable_tf1_compat()
 
 #
 from stable_baselines import logger
@@ -47,7 +60,7 @@ def parser():
 
 def main():
     args = parser().parse_args()
-    cfg = YAML().load(open(os.environ["FlightLxx_PATH"] +
+    cfg = YAML().load(open(os.environ.get("FlightLxx_PATH", PROJECT_ROOT) +
                            "/libs/config/vec_env.yaml", 'r'))
     if not args.train:
         cfg["env"]["num_envs"] = 1
@@ -106,8 +119,17 @@ def main():
 
     # # Testing mode with a trained weight
     else:
-        model_1 = PPO2.load(args.weight_1)
-        model_2 = PPO2.load(args.weight_2)
+        custom_objects = {
+            "learning_rate": 3e-4,
+            "cliprange": 0.2,
+            "policy": MlpPolicy,
+            "policy_kwargs": dict(
+                net_arch=[dict(pi=[64, 64], vf=[64, 64])], act_fun=tf.nn.tanh),
+            "observation_space": env.observation_space,
+            "action_space": env.action_space,
+        }
+        model_1 = PPO2.load(args.weight_1, env=env, custom_objects=custom_objects)
+        model_2 = PPO2.load(args.weight_2, env=env, custom_objects=custom_objects)
         btc_test_model(env, model_1, model_2, render=args.render)
 
 

@@ -49,12 +49,23 @@ class QuadrotorDynamics : DynamicsBase {
   inline Scalar getMass(void) const { return mass_; };
   inline Scalar getArmLength(void) const { return arm_l_; };
   inline Scalar getMotorTauInv() const { return motor_tau_inv_; };
+  inline Scalar getMotorReversalDeadTime() const {
+    return motor_reversal_dead_time_;
+  };
+  inline Scalar getMotorDeadzoneOmega() const {
+    return motor_deadzone_omega_;
+  };
   inline Matrix<3, 3> getJ(void) const { return J_; };
   inline Matrix<3, 3> getJInv(void) const { return J_inv_; };
 
   bool setMass(const Scalar mass);
   bool setArmLength(const Scalar arm_length);
   bool setMotortauInv(const Scalar tau_inv);
+  bool setMotorReversalDeadTime(const Scalar dead_time);
+  bool setMotorDeadzoneOmega(const Scalar omega);
+  bool scaleInertia(const Vector<3>& scale);
+  bool scaleThrustMap(const Scalar positive_scale,
+                      const Scalar negative_scale);
 
   friend std::ostream& operator<<(std::ostream& os,
                                   const QuadrotorDynamics& quad_dymaics);
@@ -71,6 +82,8 @@ class QuadrotorDynamics : DynamicsBase {
   Scalar motor_omega_min_;
   Scalar motor_omega_max_;
   Scalar motor_tau_inv_;
+  Scalar motor_reversal_dead_time_;
+  Scalar motor_deadzone_omega_;
 
   // Propellers
   Vector<3> thrust_map_p_;

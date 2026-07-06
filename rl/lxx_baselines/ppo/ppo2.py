@@ -14,6 +14,117 @@ from stable_baselines.common.math_util import safe_mean
 #
 from rl.lxx_baselines.common.policies import ActorCriticPolicy, RecurrentActorCriticPolicy
 
+
+CONSOLE_LOG_GROUPS = (
+    (
+        "n_updates",
+        "total_timesteps",
+        "fps",
+        "time_elapsed",
+        "natural_episode_count",
+    ),
+    (
+        "ep_reward_mean",
+        "ep_len_mean",
+        "ep_completed_mean",
+        "ep_progress_mean",
+        "ep_path_error_mean",
+        "ep_lookahead_error_mean",
+        "ep_track_gate_mean",
+        "ep_crashed_mean",
+        "ep_ground_crash_mean",
+    ),
+    (
+        "ep_wind_total_norm_mean",
+        "ep_wind_mean_norm_mean",
+        "ep_wind_acc_norm_mean",
+        "ep_wind_difficulty_mean",
+        "ep_wind_sign_mean",
+    ),
+    (
+        "ep_checkpoint_complexity_mean",
+        "ep_checkpoint_closure_score_mean",
+        "ep_checkpoint_reverse_ratio_mean",
+        "cut_checkpoint_complexity_mean",
+        "cut_checkpoint_closure_score_mean",
+        "cut_checkpoint_reverse_ratio_mean",
+        "ep_shape_mix_mean",
+    ),
+    (
+        "ep_motor_negative_thrust_ratio_mean",
+        "ep_motor_reversal_active_ratio_mean",
+        "ep_reversal_deadzone_reward_mean",
+        "ep_thrust_switch_reward_mean",
+        "ep_body_rate_reward_mean",
+        "ep_act_second_delta_reward_mean",
+        "ep_hover_action_norm_mean",
+    ),
+    (
+        "env_policy_reward_mean",
+        "env_policy_difficulty_mean",
+        "env_policy_target_difficulty_mean",
+        "env_policy_closedness_mean",
+        "env_policy_target_closedness_mean",
+        "env_policy_wind_difficulty_mean",
+        "env_policy_action_abs_mean",
+    ),
+    (
+        "policy_entropy",
+        "explained_variance",
+        "value_loss",
+        "approxkl",
+        "clipfrac",
+        "early_stop_kl",
+    ),
+)
+
+
+def _console_value(value):
+    if isinstance(value, (np.floating, float)):
+        value = float(value)
+        if not np.isfinite(value):
+            return str(value)
+        if abs(value) >= 1e4 or (abs(value) > 0.0 and abs(value) < 1e-3):
+            return "{:.3e}".format(value)
+        return "{:.4g}".format(value)
+    if isinstance(value, (np.integer, int)):
+        return str(int(value))
+    return str(value)
+
+
+def _dump_console_kvs(kvs):
+    rows = []
+    for group in CONSOLE_LOG_GROUPS:
+        group_rows = [(key, kvs[key]) for key in group if key in kvs]
+        if group_rows:
+            if rows:
+                rows.append(None)
+            rows.extend(group_rows)
+
+    if not rows:
+        return
+
+    visible_rows = [row for row in rows if row is not None]
+    key_width = min(max(len(key) for key, _ in visible_rows), 32)
+    val_width = min(max(len(_console_value(value)) for _, value in visible_rows), 14)
+    dashes = "-" * (key_width + val_width + 7)
+    print(dashes)
+    for row in rows:
+        if row is None:
+            print("| {} | {} |".format(" " * key_width, " " * val_width))
+            continue
+        key, value = row
+        key_str = key[:key_width]
+        val_str = _console_value(value)[:val_width]
+        print("| {}{} | {}{} |".format(
+            key_str,
+            " " * (key_width - len(key_str)),
+            val_str,
+            " " * (val_width - len(val_str)),
+        ))
+    print(dashes)
+
+
 class PPO2(ActorCriticRLModel):
     """
     Proximal Policy Optimization algorithm (GPU version).
@@ -39,6 +150,7 @@ class PPO2(ActorCriticRLModel):
         IMPORTANT: this clipping depends on the reward scaling.
         To deactivate value function clipping (and recover the original PPO implementation),
         you have to pass a negative value (e.g. -1).
+    :param target_kl: (float) Stop PPO minibatch updates early when the approximate KL exceeds this value.
     :param verbose: (int) the verbosity level: 0 none, 1 training information, 2 tensorflow debug
     :param tensorboard_log: (str) the log location for tensorboard (if None, no logging)
     :param _init_setup_model: (bool) Whether or not to build the network at the creation of the instance
@@ -53,7 +165,8 @@ class PPO2(ActorCriticRLModel):
     """
     def __init__(self, policy, env, gamma=0.99, n_steps=128, ent_coef=0.01, learning_rate=2.5e-4, vf_coef=0.5,
                  max_grad_norm=0.5, lam=0.95, nminibatches=4, noptepochs=4, cliprange=0.2, cliprange_vf=None,
-                 verbose=0, tensorboard_log=None, _init_setup_model=True, policy_kwargs=None,
+                 target_kl=None, reset_on_rollout_end=False, verbose=0,
+                 tensorboard_log=None, _init_setup_model=True, policy_kwargs=None,
                  full_tensorboard_log=False, seed=None, n_cpu_tf_sess=None):
 
         self.learning_rate = learning_rate
@@ -67,6 +180,8 @@ class PPO2(ActorCriticRLModel):
         self.lam = lam
         self.nminibatches = nminibatches
         self.noptepochs = noptepochs
+        self.target_kl = target_kl
+        self.reset_on_rollout_end = reset_on_rollout_end
         self.tensorboard_log = tensorboard_log
         self.full_tensorboard_log = full_tensorboard_log
 
@@ -318,7 +433,14 @@ class PPO2(ActorCriticRLModel):
 
             t_first_start = time.time()
 
-            runner = Runner(env=self.env, model=self, n_steps=self.n_steps, gamma=self.gamma, lam=self.lam)
+            runner = Runner(
+                env=self.env,
+                model=self,
+                n_steps=self.n_steps,
+                gamma=self.gamma,
+                lam=self.lam,
+                reset_on_rollout_end=self.reset_on_rollout_end,
+            )
             self.episode_reward = np.zeros((self.n_envs,))
 
             ep_info_buf = deque(maxlen=100)
@@ -337,13 +459,14 @@ class PPO2(ActorCriticRLModel):
 
                     t_start = time.time()
                     # Unpack
-                    obs, returns, masks, actions, values, neglogpacs, states, ep_infos, true_reward = runner.run()
+                    obs, returns, masks, actions, values, neglogpacs, states, ep_infos, rollout_infos, true_reward = runner.run()
                     # # add by Yunlong
                     t_now = time.time()
                     fps = int(self.n_batch / (t_now - t_start))
 
                     self.ep_info_buf.extend(ep_infos)
                     mb_loss_vals = []
+                    early_stop_kl = False
                     if states is None:  # nonrecurrent version
                         update_fac = self.n_batch // self.nminibatches // self.noptepochs + 1
                         inds = np.arange(self.n_batch)
@@ -355,8 +478,14 @@ class PPO2(ActorCriticRLModel):
                                 end = start + batch_size
                                 mbinds = inds[start:end]
                                 slices = (arr[mbinds] for arr in (obs, returns, masks, actions, values, neglogpacs))
-                                mb_loss_vals.append(self._train_step(lr_now, cliprange_now, *slices, writer=writer,
-                                                                    update=timestep, cliprange_vf=cliprange_vf_now))
+                                loss_val = self._train_step(lr_now, cliprange_now, *slices, writer=writer,
+                                                            update=timestep, cliprange_vf=cliprange_vf_now)
+                                mb_loss_vals.append(loss_val)
+                                if self.target_kl is not None and loss_val[3] > self.target_kl:
+                                    early_stop_kl = True
+                                    break
+                            if early_stop_kl:
+                                break
                     else:  # recurrent version
                         update_fac = self.n_batch // self.nminibatches // self.noptepochs // self.n_steps + 1
                         assert self.n_envs % self.nminibatches == 0
@@ -373,9 +502,15 @@ class PPO2(ActorCriticRLModel):
                                 mb_flat_inds = flat_indices[mb_env_inds].ravel()
                                 slices = (arr[mb_flat_inds] for arr in (obs, returns, masks, actions, values, neglogpacs))
                                 mb_states = states[mb_env_inds]
-                                mb_loss_vals.append(self._train_step(lr_now, cliprange_now, *slices, update=timestep,
-                                                                    writer=writer, states=mb_states,
-                                                                    cliprange_vf=cliprange_vf_now))
+                                loss_val = self._train_step(lr_now, cliprange_now, *slices, update=timestep,
+                                                            writer=writer, states=mb_states,
+                                                            cliprange_vf=cliprange_vf_now)
+                                mb_loss_vals.append(loss_val)
+                                if self.target_kl is not None and loss_val[3] > self.target_kl:
+                                    early_stop_kl = True
+                                    break
+                            if early_stop_kl:
+                                break
 
                     loss_vals = np.mean(mb_loss_vals, axis=0)
                     # # comment out by Yunlong
@@ -398,10 +533,54 @@ class PPO2(ActorCriticRLModel):
                         if len(self.ep_info_buf) > 0 and len(self.ep_info_buf[0]) > 0:
                             logger.logkv('ep_reward_mean', safe_mean([ep_info['r'] for ep_info in self.ep_info_buf]))
                             logger.logkv('ep_len_mean', safe_mean([ep_info['l'] for ep_info in self.ep_info_buf]))
+                            ep_extra_keys = sorted({
+                                key for ep_info in self.ep_info_buf
+                                for key in ep_info.keys()
+                            } - {'r', 'l'})
+                            for key in ep_extra_keys:
+                                values_to_log = []
+                                for ep_info in self.ep_info_buf:
+                                    if key in ep_info:
+                                        try:
+                                            value = float(ep_info[key])
+                                        except (TypeError, ValueError):
+                                            continue
+                                        if np.isfinite(value):
+                                            values_to_log.append(value)
+                                if len(values_to_log) > 0:
+                                    logger.logkv('ep_{}_mean'.format(key),
+                                                 safe_mean(values_to_log))
+                        logger.logkv('natural_episode_count', len(ep_infos))
+                        logger.logkv('cut_fragment_count', len(rollout_infos))
+                        if len(rollout_infos) > 0:
+                            logger.logkv('cut_reward_mean',
+                                         safe_mean([info['r'] for info in rollout_infos]))
+                            logger.logkv('cut_len_mean',
+                                         safe_mean([info['l'] for info in rollout_infos]))
+                            rollout_extra_keys = sorted({
+                                key for info in rollout_infos
+                                for key in info.keys()
+                            } - {'r', 'l'})
+                            for key in rollout_extra_keys:
+                                values_to_log = []
+                                for info in rollout_infos:
+                                    if key in info:
+                                        try:
+                                            value = float(info[key])
+                                        except (TypeError, ValueError):
+                                            continue
+                                        if np.isfinite(value):
+                                            values_to_log.append(value)
+                                if len(values_to_log) > 0:
+                                    logger.logkv('cut_{}_mean'.format(key),
+                                                 safe_mean(values_to_log))
                         logger.logkv('time_elapsed', t_start - t_first_start)
                         logger.logkv('true_reward', np.mean(true_reward))
                         for (loss_val, loss_name) in zip(loss_vals, self.loss_names):
                             logger.logkv(loss_name, loss_val)
+                        logger.logkv('early_stop_kl', float(early_stop_kl))
+                        if hasattr(logger, "getkvs"):
+                            _dump_console_kvs(dict(logger.getkvs()))
                         logger.dumpkvs()
                     
                     if callback is not None:
@@ -429,6 +608,8 @@ class PPO2(ActorCriticRLModel):
             "noptepochs": self.noptepochs,
             "cliprange": self.cliprange,
             "cliprange_vf": self.cliprange_vf,
+            "target_kl": self.target_kl,
+            "reset_on_rollout_end": self.reset_on_rollout_end,
             "verbose": self.verbose,
             "policy": self.policy,
             "observation_space": self.observation_space,
@@ -446,7 +627,8 @@ class PPO2(ActorCriticRLModel):
 
 
 class Runner(AbstractEnvRunner):
-    def __init__(self, *, env, model, n_steps, gamma, lam):
+    def __init__(self, *, env, model, n_steps, gamma, lam,
+                 reset_on_rollout_end=False):
         """
         A runner to learn the policy of an environment for a model
 
@@ -459,6 +641,7 @@ class Runner(AbstractEnvRunner):
         super().__init__(env=env, model=model, n_steps=n_steps)
         self.lam = lam
         self.gamma = gamma
+        self.reset_on_rollout_end = reset_on_rollout_end
 
     def _run(self):
         """
@@ -516,7 +699,7 @@ class Runner(AbstractEnvRunner):
         # mb_mean_actions = np.asarray(mb_tanh_actions)
         mb_values = np.asarray(mb_values, dtype=np.float32)
         mb_neglogpacs = np.asarray(mb_neglogpacs, dtype=np.float32)
-        mb_dones = np.asarray(mb_dones, dtype=np.bool)
+        mb_dones = np.asarray(mb_dones, dtype=bool)
         last_values = self.model.value(self.obs, self.states, self.dones)
         # discount/bootstrap off value fn
         mb_advs = np.zeros_like(mb_rewards)
@@ -536,12 +719,22 @@ class Runner(AbstractEnvRunner):
         mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs, true_reward = \
             map(swap_and_flatten, (mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs, true_reward))
         
-        self.obs, infos = self.env.reset_and_update_info()
+        rollout_infos = []
+        if self.reset_on_rollout_end:
+            self.obs, infos = self.env.reset_and_update_info()
+            for info in infos:
+                maybe_ep_info = info.get('episode')
+                if maybe_ep_info is not None:
+                    rollout_infos.append(maybe_ep_info)
+        elif hasattr(self.env, "rollout_info"):
+            infos = self.env.rollout_info(clear=False)
+            for info in infos:
+                maybe_ep_info = info.get('episode')
+                if maybe_ep_info is not None:
+                    rollout_infos.append(maybe_ep_info)
 
-        for info in infos:
-            ep_infos.append(info.get('episode'))
-
-        return mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs, mb_states, ep_infos, true_reward
+        return mb_obs, mb_returns, mb_dones, mb_actions, mb_values, \
+            mb_neglogpacs, mb_states, ep_infos, rollout_infos, true_reward
 
 
 # obs, returns, masks, actions, values, neglogpacs, states = runner.run()

@@ -25,11 +25,17 @@ PYBIND11_MODULE(flightgym, m) {
     .def("close", &VecEnv<QuadrotorEnv>::close)
     .def("isTerminalState", &VecEnv<QuadrotorEnv>::isTerminalState)
     .def("curriculumUpdate", &VecEnv<QuadrotorEnv>::curriculumUpdate)
+    .def("getEnvPolicyObs", &VecEnv<QuadrotorEnv>::getEnvPolicyObs)
+    .def("applyEnvPolicyActions",
+         &VecEnv<QuadrotorEnv>::applyEnvPolicyActions)
     .def("connectUnity", &VecEnv<QuadrotorEnv>::connectUnity)
     .def("disconnectUnity", &VecEnv<QuadrotorEnv>::disconnectUnity)
     .def("getNumOfEnvs", &VecEnv<QuadrotorEnv>::getNumOfEnvs)
     .def("getObsDim", &VecEnv<QuadrotorEnv>::getObsDim)
     .def("getActDim", &VecEnv<QuadrotorEnv>::getActDim)
+    .def("getEnvPolicyObsDim", &VecEnv<QuadrotorEnv>::getEnvPolicyObsDim)
+    .def("getEnvPolicyActDim", &VecEnv<QuadrotorEnv>::getEnvPolicyActDim)
+    .def("getEpisodeLength", &VecEnv<QuadrotorEnv>::getEpisodeLength)
     .def("getExtraInfoNames", &VecEnv<QuadrotorEnv>::getExtraInfoNames)
     .def("__repr__", [](const VecEnv<QuadrotorEnv>& a) {
       return "RPG Drone Racing Environment";

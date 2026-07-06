@@ -33,7 +33,9 @@ class Quadrotor : ObjectBase {
   bool getState(QuadState* const state) const;
   bool getMotorThrusts(Ref<Vector<4>> motor_thrusts) const;
   bool getMotorOmega(Ref<Vector<4>> motor_omega) const;
+  Scalar getMotorReversalActiveRatio() const;
   bool getDynamics(QuadrotorDynamics* const dynamics) const;
+  Vector<3> getWindVelocity(void) const;
 
   const QuadrotorDynamics& getDynamics();
   Vector<3> getSize(void) const;
@@ -48,6 +50,8 @@ class Quadrotor : ObjectBase {
   bool setCommand(const Command& cmd);
   bool updateDynamics(const QuadrotorDynamics& dynamics);
   bool addRGBCamera(std::shared_ptr<RGBCamera> camera);
+  void setWindVelocity(const Ref<Vector<3>> wind_velocity);
+  void setWindDrag(const Scalar linear_drag, const Scalar quadratic_drag);
 
   // low-level controller
   Vector<4> runFlightCtl(const Scalar sim_dt, const Vector<3>& omega,
@@ -83,6 +87,7 @@ class Quadrotor : ObjectBase {
   // auxiliar variablers
   Vector<4> motor_omega_;
   Vector<4> motor_thrusts_;
+  Vector<4> motor_reversal_timers_;
   Matrix<4, 4> B_allocation_;
   Matrix<4, 4> B_allocation_inv_;
 
@@ -94,6 +99,9 @@ class Quadrotor : ObjectBase {
 
   // auxiliary variables
   Matrix<3, 2> world_box_;
+  Vector<3> wind_velocity_{Vector<3>::Zero()};
+  Scalar wind_linear_drag_{0.0};
+  Scalar wind_quadratic_drag_{0.0};
 };
 
 }  // namespace flightlib

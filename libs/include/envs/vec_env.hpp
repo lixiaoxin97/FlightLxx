@@ -41,6 +41,7 @@ class VecEnv {
 
   // public get functions
   void getObs(Ref<MatrixRowMajor<>> obs);
+  void getEnvPolicyObs(Ref<MatrixRowMajor<>> obs);
   size_t getEpisodeLength(void);
 
   // - auxiliary functions
@@ -49,6 +50,7 @@ class VecEnv {
                 Ref<Vector<>> reward, Ref<BoolVector<>> done,
                 Ref<MatrixRowMajor<>> extra_info);
   void curriculumUpdate();
+  void applyEnvPolicyActions(Ref<MatrixRowMajor<>> act);
 
   // flightmare (visualization)
   bool setUnity(bool render);
@@ -61,6 +63,12 @@ class VecEnv {
   inline bool getUnityRender(void) { return unity_render_; };
   inline int getObsDim(void) { return obs_dim_; };
   inline int getActDim(void) { return act_dim_; };
+  inline int getEnvPolicyObsDim(void) {
+    return envs_.empty() ? 0 : envs_[0]->getEnvPolicyObsDim();
+  };
+  inline int getEnvPolicyActDim(void) {
+    return envs_.empty() ? 0 : envs_[0]->getEnvPolicyActDim();
+  };
   inline int getExtraInfoDim(void) { return extra_info_names_.size(); };
   inline int getNumOfEnvs(void) { return envs_.size(); };
   inline std::vector<std::string>& getExtraInfoNames() {

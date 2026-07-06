@@ -32,6 +32,61 @@ def nature_cnn(scaled_images, **kwargs):
     return activ(linear(layer_3, 'fc1', n_hidden=512, init_scale=np.sqrt(2)))
 
 
+def history_cnn_extractor(flat_observations,
+                          history_len=50,
+                          frame_dim=25,
+                          short_history_len=5,
+                          cnn_features=64,
+                          hidden_size=512,
+                          act_fun=tf.nn.tanh,
+                          **_kwargs):
+    """
+    Lightweight temporal CNN for stacked drone proprioceptive observations.
+
+    The input is a flattened [history_len, frame_dim] sequence produced by the
+    vectorized environment wrapper. The latest frame and the short recent
+    history preserve high-frequency control information, while the Conv1D path
+    compresses the full one-second history into a compact disturbance-response
+    feature.
+    """
+    history_len = int(history_len)
+    frame_dim = int(frame_dim)
+    short_history_len = min(max(int(short_history_len), 1), history_len)
+    hidden_size = int(hidden_size)
+    cnn_features = int(cnn_features)
+
+    sequence = tf.reshape(flat_observations, [-1, history_len, frame_dim])
+    current_obs = sequence[:, -1, :]
+    short_history = tf.layers.flatten(sequence[:, -short_history_len:, :])
+
+    conv_1 = act_fun(tf.compat.v1.layers.conv1d(
+        sequence,
+        filters=32,
+        kernel_size=6,
+        strides=3,
+        padding="valid",
+        name="history_c1",
+    ))
+    conv_2 = act_fun(tf.compat.v1.layers.conv1d(
+        conv_1,
+        filters=16,
+        kernel_size=4,
+        strides=2,
+        padding="valid",
+        name="history_c2",
+    ))
+    long_history = tf.layers.flatten(conv_2)
+    long_history = act_fun(linear(
+        long_history, "history_fc", cnn_features, init_scale=np.sqrt(2)))
+
+    features = tf.concat([current_obs, short_history, long_history], axis=1)
+    latent = act_fun(linear(
+        features, "history_shared_fc0", hidden_size, init_scale=np.sqrt(2)))
+    latent = act_fun(linear(
+        latent, "history_shared_fc1", hidden_size, init_scale=np.sqrt(2)))
+    return latent
+
+
 def mlp_extractor(flat_observations, net_arch, act_fun):
     """
     Constructs an MLP that receives observations as an input and outputs a latent representation for the policy and
@@ -626,6 +681,30 @@ class CnnPolicy(FeedForwardPolicy):
     def __init__(self, sess, ob_space, ac_space, n_env, n_steps, n_batch, reuse=False, **_kwargs):
         super(CnnPolicy, self).__init__(sess, ob_space, ac_space, n_env, n_steps, n_batch, reuse,
                                         feature_extraction="cnn", **_kwargs)
+
+
+class HistoryCnnPolicy(FeedForwardPolicy):
+    """
+    Actor-critic policy for one-second stacked drone state histories.
+
+    This is not an image CNN. It uses Conv1D over a temporal sequence of
+    proprioceptive/path observations to infer wind, actuator lag, and dynamics
+    mismatch from recent state-action response.
+    """
+
+    def __init__(self, sess, ob_space, ac_space, n_env, n_steps, n_batch,
+                 reuse=False, **_kwargs):
+        super(HistoryCnnPolicy, self).__init__(
+            sess,
+            ob_space,
+            ac_space,
+            n_env,
+            n_steps,
+            n_batch,
+            reuse,
+            feature_extraction="cnn",
+            cnn_extractor=history_cnn_extractor,
+            **_kwargs)
 
 
 class CnnLstmPolicy(LstmPolicy):

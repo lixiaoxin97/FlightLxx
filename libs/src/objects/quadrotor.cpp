@@ -1,5 +1,7 @@
 #include "quadrotor.hpp"
 
+#include <algorithm>
+
 namespace flightlib {
 
 Quadrotor::Quadrotor(const std::string &cfg_path)
@@ -53,9 +55,15 @@ bool Quadrotor::run(const Scalar ctl_dt) {
 
     const Vector<4> force_torques = B_allocation_ * motor_thrusts_;
 
-    // Compute linear acceleration and body torque
+    // Compute linear acceleration and body torque.
     const Vector<3> force(0.0, 0.0, force_torques[0]);
-    state_.a = state_.q() * force * 1.0 / dynamics_.getMass() + gz_;
+    const Vector<3> relative_air_velocity = state_.v - wind_velocity_;
+    const Vector<3> wind_force =
+      -wind_linear_drag_ * relative_air_velocity -
+      wind_quadratic_drag_ * relative_air_velocity.norm() *
+        relative_air_velocity;
+    state_.a = state_.q() * force * 1.0 / dynamics_.getMass() + gz_ +
+               wind_force / dynamics_.getMass();
 
     // compute body torque
     state_.tau = force_torques.segment<3>(1);
@@ -86,6 +94,7 @@ bool Quadrotor::reset(void) {
   state_.setZero();
   motor_omega_.setZero();
   motor_thrusts_.setZero();
+  motor_reversal_timers_.setZero();
   return true;
 }
 
@@ -94,6 +103,7 @@ bool Quadrotor::reset(const QuadState &state) {
   state_ = state;
   motor_omega_.setZero();
   motor_thrusts_.setZero();
+  motor_reversal_timers_.setZero();
   return true;
 }
 
@@ -121,10 +131,34 @@ void Quadrotor::runMotors(const Scalar sim_dt,
     dynamics_.motorThrustToOmega(motor_thruts_des);
   const Vector<4> motor_omega_clamped =
     dynamics_.clampMotorOmega(motor_omega_des);
+  Vector<4> motor_omega_target = motor_omega_clamped;
+  const Scalar dead_time = dynamics_.getMotorReversalDeadTime();
+  const Scalar deadzone_omega = dynamics_.getMotorDeadzoneOmega();
+
+  for (int i = 0; i < 4; ++i) {
+    const bool target_has_sign =
+      std::abs(motor_omega_clamped(i)) > deadzone_omega;
+    const bool motor_has_sign = std::abs(motor_omega_(i)) > deadzone_omega;
+    const bool sign_reversal =
+      target_has_sign && motor_has_sign &&
+      motor_omega_clamped(i) * motor_omega_(i) < 0.0;
+
+    if (dead_time > 0.0 && sign_reversal &&
+        motor_reversal_timers_(i) <= 0.0) {
+      motor_reversal_timers_(i) = dead_time;
+    }
+
+    if (motor_reversal_timers_(i) > 0.0) {
+      motor_reversal_timers_(i) =
+        std::max(static_cast<Scalar>(0.0),
+                 motor_reversal_timers_(i) - sim_dt);
+      motor_omega_target(i) = 0.0;
+    }
+  }
 
   // simulate motors as a first-order system
   const Scalar c = std::exp(-sim_dt * dynamics_.getMotorTauInv());
-  motor_omega_ = c * motor_omega_ + (1.0 - c) * motor_omega_clamped;
+  motor_omega_ = c * motor_omega_ + (1.0 - c) * motor_omega_target;
 
   motor_thrusts_ = dynamics_.motorOmegaToThrust(motor_omega_);
   motor_thrusts_ = dynamics_.clampThrust(motor_thrusts_);
@@ -213,6 +247,18 @@ bool Quadrotor::getMotorOmega(Ref<Vector<4>> motor_omega) const {
   return true;
 }
 
+Scalar Quadrotor::getMotorReversalActiveRatio() const {
+  int active_count = 0;
+  for (int i = 0; i < 4; ++i) {
+    if (motor_reversal_timers_(i) > 0.0) {
+      active_count += 1;
+    }
+  }
+  return static_cast<Scalar>(active_count) / static_cast<Scalar>(4);
+}
+
+Vector<3> Quadrotor::getWindVelocity(void) const { return wind_velocity_; }
+
 bool Quadrotor::getDynamics(QuadrotorDynamics *const dynamics) const {
   if (!dynamics_.valid()) return false;
   *dynamics = dynamics_;
@@ -238,6 +284,16 @@ bool Quadrotor::updateDynamics(const QuadrotorDynamics &dynamics) {
 bool Quadrotor::addRGBCamera(std::shared_ptr<RGBCamera> camera) {
   rgb_cameras_.push_back(camera);
   return true;
+}
+
+void Quadrotor::setWindVelocity(const Ref<Vector<3>> wind_velocity) {
+  wind_velocity_ = wind_velocity;
+}
+
+void Quadrotor::setWindDrag(const Scalar linear_drag,
+                            const Scalar quadratic_drag) {
+  wind_linear_drag_ = std::max(static_cast<Scalar>(0.0), linear_drag);
+  wind_quadratic_drag_ = std::max(static_cast<Scalar>(0.0), quadratic_drag);
 }
 
 Vector<3> Quadrotor::getSize(void) const { return size_; }

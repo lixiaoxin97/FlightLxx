@@ -1,5 +1,7 @@
 #include "vec_env.hpp"
 
+#include <algorithm>
+
 namespace flightlib {
 
 template<typename EnvBase>
@@ -130,6 +132,17 @@ void VecEnv<EnvBase>::getObs(Ref<MatrixRowMajor<>> obs) {
   for (int i = 0; i < num_envs_; i++) envs_[i]->getObs(obs.row(i));
 }
 
+template<typename EnvBase>
+void VecEnv<EnvBase>::getEnvPolicyObs(Ref<MatrixRowMajor<>> obs) {
+  if (obs.rows() != num_envs_ || obs.cols() != getEnvPolicyObsDim()) {
+    logger_.error("Input matrix dimensions do not match with env policy obs.");
+    return;
+  }
+  for (int i = 0; i < num_envs_; i++) {
+    envs_[i]->getEnvPolicyObs(obs.row(i));
+  }
+}
+
 
 template<typename EnvBase>
 size_t VecEnv<EnvBase>::getEpisodeLength(void) {
@@ -199,7 +212,42 @@ void VecEnv<EnvBase>::disconnectUnity(void) {
 
 template<typename EnvBase>
 void VecEnv<EnvBase>::curriculumUpdate(void) {
-  for (int i = 0; i < num_envs_; i++) envs_[i]->curriculumUpdate();
+  if (envs_.empty()) return;
+
+  std::vector<std::pair<Scalar, int>> ranked_scores;
+  ranked_scores.reserve(envs_.size());
+  for (int i = 0; i < num_envs_; i++) {
+    ranked_scores.emplace_back(envs_[i]->getEnvironmentScore(), i);
+  }
+
+  std::sort(ranked_scores.begin(), ranked_scores.end(),
+            [](const auto& lhs, const auto& rhs) {
+              return lhs.first > rhs.first;
+            });
+
+  std::vector<int> ranks(num_envs_, 0);
+  for (int rank = 0; rank < num_envs_; rank++) {
+    ranks[ranked_scores[rank].second] = rank;
+  }
+
+  const int lower_rank = static_cast<int>(0.50 * std::max(0, num_envs_ - 1));
+  const int upper_rank = static_cast<int>(0.90 * std::max(0, num_envs_ - 1));
+
+  for (int i = 0; i < num_envs_; i++) {
+    envs_[i]->applyPathEnvironmentPolicy(
+      ranks[i], num_envs_, lower_rank, std::max(lower_rank, upper_rank));
+  }
+}
+
+template<typename EnvBase>
+void VecEnv<EnvBase>::applyEnvPolicyActions(Ref<MatrixRowMajor<>> act) {
+  if (act.rows() != num_envs_ || act.cols() != getEnvPolicyActDim()) {
+    logger_.error("Input matrix dimensions do not match with env policy act.");
+    return;
+  }
+  for (int i = 0; i < num_envs_; i++) {
+    envs_[i]->applyEnvPolicyAction(act.row(i));
+  }
 }
 
 // template<typename EnvBase>
