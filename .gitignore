@@ -1,2 +1,21 @@
-FlightLxx.egg-info
-.vscode
+# Build artifacts
+build/
+FlightLxx.egg-info/
+*.so
+*.o
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+
+# Experiment results (regenerate with run_experiment.py)
+Simulation_Experiments/results*.csv
+Simulation_Experiments/figures/*.pdf
+Simulation_Experiments/figures/*.png
+
+# macOS
+.DS_Store

@@ -115,19 +115,13 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
   }
 
 
-  //############################################################################
-  //###################### Dynamic Randominzation ##############################
-  //############################################################################
-  // YAML::Node cfg_ = YAML::LoadFile(getenv("FlightLxx_PATH") + std::string("/libs/config/rl_env.yaml"));
-  // QuadrotorDynamics dynamics;
-  // dynamics.updateParams(cfg_);
-  // dynamics.dynamicRandomization();
-  // dynamics.showQuadrotorDynamicsParams();
-  // quadrotor_ptr_->updateDynamics(dynamics);
-  //############################################################################
-  //############################################################################
-  //############################################################################
-
+  // ---- Domain Randomization (CTBR+DR) ----
+  if (dr_enabled_) {
+    QuadrotorDynamics dynamics;
+    quadrotor_ptr_->getDynamics(&dynamics);  // start from current platform params
+    dynamics.dynamicRandomization();         // apply random perturbations
+    quadrotor_ptr_->updateDynamics(dynamics);
+  }
 
   // reset quadrotor with random states
   quadrotor_ptr_->reset(quad_state_);
@@ -280,6 +274,70 @@ std::ostream &operator<<(std::ostream &os, const QuadrotorEnv &quad_env) {
      << "obs_std =            [" << quad_env.obs_std_.transpose() << std::endl;
   os.precision();
   return os;
+}
+
+// ---- New interfaces for simulation experiments ----
+
+namespace {
+
+// Convert [pos(3), euler_zyx(3), vel(3), omega(3)] — 12D obs → QuadState 25D
+void obs12ToQuadState(const Ref<Vector<12>> obs12, QuadState& qs) {
+  qs.setZero();
+  // position
+  qs.p = obs12.segment<3>(0);
+  // euler ZYX → quaternion [w, x, y, z]
+  Vector<3> euler = obs12.segment<3>(3);
+  Eigen::Quaternion<Scalar> q(
+      Eigen::AngleAxis<Scalar>(euler.z(), Vector<3>::UnitZ()) *
+      Eigen::AngleAxis<Scalar>(euler.y(), Vector<3>::UnitY()) *
+      Eigen::AngleAxis<Scalar>(euler.x(), Vector<3>::UnitX()));
+  qs.qx << q.w(), q.x(), q.y(), q.z();
+  // linear velocity
+  qs.v = obs12.segment<3>(6);
+  // body rates
+  qs.w = obs12.segment<3>(9);
+}
+
+}  // anonymous namespace
+
+bool QuadrotorEnv::setQuadState(const Ref<Vector<12>> state) {
+  obs12ToQuadState(state, quad_state_);
+  quadrotor_ptr_->setState(quad_state_);
+  return true;
+}
+
+bool QuadrotorEnv::setDynamics(const YAML::Node &cfg) {
+  QuadrotorDynamics dynamics;
+  if (!dynamics.updateParams(cfg)) return false;
+  quadrotor_ptr_->updateDynamics(dynamics);
+  quadrotor_ptr_->setWorldBox(world_box_);
+  return true;
+}
+
+bool QuadrotorEnv::enableIdealDynamics(const bool enable) {
+  quadrotor_ptr_->setIdealDynamics(enable);
+  return true;
+}
+
+bool QuadrotorEnv::enableDynamicRandomization(const bool enable) {
+  dr_enabled_ = enable;
+  return true;
+}
+
+bool QuadrotorEnv::applyImpulse(const Ref<Vector<3>> impulse) {
+  quadrotor_ptr_->applyImpulse(impulse);
+  return true;
+}
+
+bool QuadrotorEnv::resetToState(const Ref<Vector<12>> state, Ref<Vector<>> obs) {
+  obs12ToQuadState(state, quad_state_);
+  quad_act_.setZero();
+  quadrotor_ptr_->reset(quad_state_);
+  cmd_.t = 0.0;
+  cmd_.collective_thrust = 0.0;
+  cmd_.omega.setZero();
+  getObs(obs);
+  return true;
 }
 
 }  // namespace flightlib

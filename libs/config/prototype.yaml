@@ -1,0 +1,26 @@
+# Prototype quadrotor dynamics (custom-built platform)
+# Paper1_MS Table 1 — CTBR training platform
+quadrotor_dynamics:
+  mass: 0.78
+  arm_l: 0.125
+  motor_omega_min: 3000.0
+  motor_omega_max: 29400.0
+  motor_tau: 0.033
+  thrust_map: [1.8495740127948213e-08, -7.055596047224982e-05, 6.546158341970494e-02]
+  kappa: 0.01
+  omega_max: [6.2831852, 6.2831852, 3.1415926]
+  inertia: [0.0023, 0.0023, 0.0036]
+  P_rate: [16.6, 16.6, 5.0]
+
+quadrotor_env:
+  camera: no
+  sim_dt: 0.02
+  max_t: 10.0
+  add_camera: yes
+
+rl:
+  pos_coeff: -0.02
+  ori_coeff: -0.02
+  lin_vel_coeff: -0.0002
+  ang_vel_coeff: -0.0002
+  act_coeff: 0

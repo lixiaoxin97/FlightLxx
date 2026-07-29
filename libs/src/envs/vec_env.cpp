@@ -202,6 +202,52 @@ void VecEnv<EnvBase>::curriculumUpdate(void) {
   for (int i = 0; i < num_envs_; i++) envs_[i]->curriculumUpdate();
 }
 
+// ---- New interfaces for simulation experiments ----
+
+template<typename EnvBase>
+bool VecEnv<EnvBase>::setQuadState(Ref<Vector<12>> state) {
+  auto* env = dynamic_cast<QuadrotorEnv*>(envs_[0].get());
+  if (!env) return false;
+  return env->setQuadState(state);
+}
+
+template<typename EnvBase>
+bool VecEnv<EnvBase>::setDynamics(const std::string& yaml_str) {
+  YAML::Node cfg = YAML::Load(yaml_str);
+  auto* env = dynamic_cast<QuadrotorEnv*>(envs_[0].get());
+  if (!env) return false;
+  return env->setDynamics(cfg);
+}
+
+template<typename EnvBase>
+bool VecEnv<EnvBase>::enableDynamicRandomization(const bool enable) {
+  auto* env = dynamic_cast<QuadrotorEnv*>(envs_[0].get());
+  if (!env) return false;
+  return env->enableDynamicRandomization(enable);
+}
+
+template<typename EnvBase>
+bool VecEnv<EnvBase>::enableIdealDynamics(const bool enable) {
+  auto* env = dynamic_cast<QuadrotorEnv*>(envs_[0].get());
+  if (!env) return false;
+  return env->enableIdealDynamics(enable);
+}
+
+template<typename EnvBase>
+bool VecEnv<EnvBase>::applyImpulse(Ref<Vector<3>> impulse) {
+  auto* env = dynamic_cast<QuadrotorEnv*>(envs_[0].get());
+  if (!env) return false;
+  return env->applyImpulse(impulse);
+}
+
+template<typename EnvBase>
+bool VecEnv<EnvBase>::resetToState(Ref<Vector<12>> state,
+                                   Ref<MatrixRowMajor<>> obs) {
+  auto* env = dynamic_cast<QuadrotorEnv*>(envs_[0].get());
+  if (!env) return false;
+  return env->resetToState(state, obs.row(0));
+}
+
 // template<typename EnvBase>
 // std::ostream& operator<<(std::ostream& os, const VecEnv<EnvBase>& env) {
 //   os.precision(3);

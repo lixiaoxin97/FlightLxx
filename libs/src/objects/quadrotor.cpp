@@ -44,21 +44,30 @@ bool Quadrotor::run(const Scalar ctl_dt) {
   while (remain_ctl_dt > 0.0) {
     const Scalar sim_dt = std::min(remain_ctl_dt, max_dt);
 
-    const Vector<4> motor_thrusts_des =
-      cmd_.isSingleRotorThrusts() ? cmd_.thrusts
-                                  : runFlightCtl(sim_dt, state_.w, cmd_);
+    if (ideal_dynamics_) {
+      // ---- Ideal Dynamics (CTBR+ID): skip motor model & P-controller ----
+      // Directly apply cmd bodyrates & collective thrust as acceleration
+      const Vector<3> force(0.0, 0.0, cmd_.collective_thrust);
+      state_.a = state_.q() * force + gz_;
+      state_.w = cmd_.omega;
+      state_.tau.setZero();
+    } else {
+      // ---- Normal mode: P-controller + motor model + aerodynamics ----
+      const Vector<4> motor_thrusts_des =
+        cmd_.isSingleRotorThrusts() ? cmd_.thrusts
+                                    : runFlightCtl(sim_dt, state_.w, cmd_);
 
-    runMotors(sim_dt, motor_thrusts_des);
-    // motor_thrusts_ = cmd_.thrusts;
+      runMotors(sim_dt, motor_thrusts_des);
 
-    const Vector<4> force_torques = B_allocation_ * motor_thrusts_;
+      const Vector<4> force_torques = B_allocation_ * motor_thrusts_;
 
-    // Compute linear acceleration and body torque
-    const Vector<3> force(0.0, 0.0, force_torques[0]);
-    state_.a = state_.q() * force * 1.0 / dynamics_.getMass() + gz_;
+      // Compute linear acceleration and body torque
+      const Vector<3> force(0.0, 0.0, force_torques[0]);
+      state_.a = state_.q() * force * 1.0 / dynamics_.getMass() + gz_;
 
-    // compute body torque
-    state_.tau = force_torques.segment<3>(1);
+      // compute body torque
+      state_.tau = force_torques.segment<3>(1);
+    }
 
     // dynamics integration
     integrator_ptr_->step(state_.x, sim_dt, next_state.x);
@@ -69,19 +78,6 @@ bool Quadrotor::run(const Scalar ctl_dt) {
     //
     state_.x = next_state.x;
     remain_ctl_dt -= sim_dt;
-
-    // ###################################################################################
-    // ################################# Only Kinematics #################################
-    // const Scalar sim_dt = std::min(remain_ctl_dt, max_dt);
-    // const Vector<3> force(0.0, 0.0, cmd_.collective_thrust);
-    // state_.a = state_.q() * force + gz_;
-    // state_.w = cmd_.omega;
-    // integrator_ptr_->step(state_.x, sim_dt, next_state.x);
-    // state_.qx /= state_.qx.norm();
-    // state_.x = next_state.x;
-    // remain_ctl_dt -= sim_dt;
-    // ###################################################################################
-
   }
   state_.t += ctl_dt;
   //
@@ -245,6 +241,10 @@ bool Quadrotor::updateDynamics(const QuadrotorDynamics &dynamics) {
 
   B_allocation_ = dynamics_.getAllocationMatrix();
   B_allocation_inv_ = B_allocation_.inverse();
+
+  // Copy P_rate from dynamics (per-platform, loaded from YAML)
+  Kinv_ang_vel_tau_ = dynamics_.getPRate();
+
   return true;
 }
 
@@ -272,5 +272,11 @@ bool Quadrotor::getCamera(const size_t cam_id,
 }
 
 bool Quadrotor::getCollision() const { return collision_; }
+
+void Quadrotor::applyImpulse(const Vector<3>& impulse) {
+  // impulse in world frame (N·s) → velocity increment (m/s): Δv = J / m
+  const Vector<3> dv = impulse / dynamics_.getMass();
+  state_.v += dv;
+}
 
 }  // namespace flightlib

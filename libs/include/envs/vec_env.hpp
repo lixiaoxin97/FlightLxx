@@ -67,6 +67,14 @@ class VecEnv {
     return extra_info_names_;
   };
 
+  // ---- New interfaces for simulation experiments ----
+  bool setQuadState(Ref<Vector<12>> state);
+  bool setDynamics(const std::string& yaml_str);
+  bool enableIdealDynamics(const bool enable);
+  bool enableDynamicRandomization(const bool enable);
+  bool applyImpulse(Ref<Vector<3>> impulse);
+  bool resetToState(Ref<Vector<12>> state, Ref<MatrixRowMajor<>> obs);
+
   // friend std::ostream& operator<<(std::ostream& os,
   //                                 const VecEnv<EnvBase>& vec_env);
 

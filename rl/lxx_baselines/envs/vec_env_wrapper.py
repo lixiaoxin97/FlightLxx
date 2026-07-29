@@ -98,6 +98,32 @@ class FlightEnvVec(VecEnv):
     def disconnectUnity(self):
         self.wrapper.disconnectUnity()
 
+    # ---- New interfaces for simulation experiments ----
+
+    def setDynamics(self, yaml_str):
+        """Switch quadrotor dynamics platform at runtime."""
+        self.wrapper.setDynamics(yaml_str)
+
+    def enableIdealDynamics(self, enable):
+        """Toggle Ideal Dynamics mode (CTBR+ID)."""
+        self.wrapper.enableIdealDynamics(enable)
+
+    def enableDynamicRandomization(self, enable):
+        """Toggle Domain Randomization (CTBR+DR)."""
+        self.wrapper.enableDynamicRandomization(enable)
+
+    def setQuadState(self, state):
+        """Set quadrotor state mid-flight (12D: pos+euler+vel+omega)."""
+        self.wrapper.setQuadState(state)
+
+    def applyImpulse(self, impulse):
+        """Apply external impulse (N·s) in world frame."""
+        self.wrapper.applyImpulse(impulse)
+
+    def resetToState(self, state, obs):
+        """Reset to a specific 12D state."""
+        self.wrapper.resetToState(state, obs)
+
     @property
     def num_envs(self):
         return self.wrapper.getNumOfEnvs()

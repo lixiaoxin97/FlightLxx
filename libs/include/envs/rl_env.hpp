@@ -63,6 +63,26 @@ class QuadrotorEnv final : public EnvBase {
   bool isTerminalState(Scalar &reward) override;
   void addObjectsToUnity(std::shared_ptr<UnityBridge> bridge);
 
+  // ---- New interfaces for simulation experiments ----
+
+  // Set quadrotor state mid-flight (for disturbance injection)
+  bool setQuadState(const Ref<Vector<12>> state);
+
+  // Switch dynamics platform at runtime
+  bool setDynamics(const YAML::Node &dynamics_cfg);
+
+  // Toggle Ideal Dynamics mode (CTBR+ID)
+  bool enableIdealDynamics(const bool enable);
+
+  // Toggle Domain Randomization (CTBR+DR)
+  bool enableDynamicRandomization(const bool enable);
+
+  // Apply an external impulse force (N·s) in world frame
+  bool applyImpulse(const Ref<Vector<3>> impulse);
+
+  // Reset with specific initial state (for throw/high-speed experiments)
+  bool resetToState(const Ref<Vector<12>> state, Ref<Vector<>> obs);
+
   friend std::ostream &operator<<(std::ostream &os,
                                   const QuadrotorEnv &quad_env);
 
@@ -91,6 +111,7 @@ class QuadrotorEnv final : public EnvBase {
 
   YAML::Node cfg_;
   Matrix<3, 2> world_box_;
+  bool dr_enabled_{false};
 };
 
 }  // namespace flightlib

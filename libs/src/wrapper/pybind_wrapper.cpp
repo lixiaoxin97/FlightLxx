@@ -31,6 +31,13 @@ PYBIND11_MODULE(flightgym, m) {
     .def("getObsDim", &VecEnv<QuadrotorEnv>::getObsDim)
     .def("getActDim", &VecEnv<QuadrotorEnv>::getActDim)
     .def("getExtraInfoNames", &VecEnv<QuadrotorEnv>::getExtraInfoNames)
+    // ---- New interfaces for simulation experiments ----
+    .def("setQuadState", &VecEnv<QuadrotorEnv>::setQuadState)
+    .def("setDynamics", &VecEnv<QuadrotorEnv>::setDynamics)
+    .def("enableIdealDynamics", &VecEnv<QuadrotorEnv>::enableIdealDynamics)
+    .def("enableDynamicRandomization", &VecEnv<QuadrotorEnv>::enableDynamicRandomization)
+    .def("applyImpulse", &VecEnv<QuadrotorEnv>::applyImpulse)
+    .def("resetToState", &VecEnv<QuadrotorEnv>::resetToState)
     .def("__repr__", [](const VecEnv<QuadrotorEnv>& a) {
       return "RPG Drone Racing Environment";
     });

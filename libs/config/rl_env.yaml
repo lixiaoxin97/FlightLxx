@@ -36,16 +36,16 @@ quadrotor_env:
 ################################### Experiment3 ######################################
 # | mass | arm_l | motor_tau | motor_omega_min | motor_omega_max | thrust_map | kappa | omega_max |
 quadrotor_dynamics:
-  mass: 0.028
+  mass: 0.027
   arm_l: 0.044
   motor_omega_min: 0.0 # motor rpm min
   motor_omega_max: 25000.0 # motor rpm max
   motor_tau: 0.0001 # motor step response
   thrust_map: [1.28192e-08, 0.0, 0.0]
   kappa: 0.005964552 # rotor drag coeff
-  omega_max: [6.2831852, 6.2831852, 3.1415926]  # body rate constraint (x, y, z) 
+  omega_max: [6.2831852, 6.2831852, 3.1415926]  # body rate constraint (x, y, z)
   inertia: [1.6571710e-05, 1.6655602e-05, 2.9261652e-05]
-  #P_rate:(200, 200, 120)
+  P_rate: [250, 250, 120]
 ######################################################################################
 ######################################################################################
 

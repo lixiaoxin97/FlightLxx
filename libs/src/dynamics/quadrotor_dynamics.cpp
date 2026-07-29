@@ -190,6 +190,16 @@ bool QuadrotorDynamics::updateParams(const YAML::Node& params) {
       params["quadrotor_dynamics"]["inertia"].as<std::vector<Scalar>>();
     inertia_ = Map<Vector<3>>(inertia.data());
 
+    // P_rate (bodyrate controller gains): optional, default to Crazyflie
+    if (params["quadrotor_dynamics"]["P_rate"]) {
+      std::vector<Scalar> p_rate;
+      p_rate =
+        params["quadrotor_dynamics"]["P_rate"].as<std::vector<Scalar>>();
+      p_rate_ = Map<Vector<3>>(p_rate.data());
+    } else {
+      p_rate_ = Vector<3>(200, 200, 120);  // default: Crazyflie
+    }
+
     // update relevant variables
     thrust_min_ = 0.0;
     thrust_max_ = motor_omega_max_ * motor_omega_max_ * thrust_map_(0) + motor_omega_max_ * thrust_map_(1) + thrust_map_(2);
@@ -254,6 +264,7 @@ bool QuadrotorDynamics::showQuadrotorDynamicsParams() {
   std::cout<< "inertia =          [" << J_.row(0) << "]\n";
   std::cout<< "                   [" << J_.row(1) << "]\n";
   std::cout<< "                   [" << J_.row(2) << "]\n";
+  std::cout<< "P_rate =           [" << p_rate_.transpose() << "]\n";
   return true;
 }
 

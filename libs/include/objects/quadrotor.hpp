@@ -49,6 +49,10 @@ class Quadrotor : ObjectBase {
   bool updateDynamics(const QuadrotorDynamics& dynamics);
   bool addRGBCamera(std::shared_ptr<RGBCamera> camera);
 
+  // Ideal Dynamics mode: skip motor model, directly apply cmd to kinematics
+  inline void setIdealDynamics(const bool enable) { ideal_dynamics_ = enable; }
+  inline bool getIdealDynamics(void) const { return ideal_dynamics_; }
+
   // low-level controller
   Vector<4> runFlightCtl(const Scalar sim_dt, const Vector<3>& omega,
                          const Command& cmd);
@@ -65,6 +69,9 @@ class Quadrotor : ObjectBase {
   inline void setSize(const Ref<Vector<3>> size) { size_ = size; };
   inline void setCollision(const bool collision) { collision_ = collision; };
 
+  // apply external impulse (N·s) in world frame
+  void applyImpulse(const Vector<3>& impulse);
+
  private:
   // quadrotor dynamics, integrators
   QuadrotorDynamics dynamics_;
@@ -79,6 +86,7 @@ class Quadrotor : ObjectBase {
   QuadState state_;
   Vector<3> size_;
   bool collision_;
+  bool ideal_dynamics_{false};
 
   // auxiliar variablers
   Vector<4> motor_omega_;
@@ -86,24 +94,9 @@ class Quadrotor : ObjectBase {
   Matrix<4, 4> B_allocation_;
   Matrix<4, 4> B_allocation_inv_;
 
-  // P gain for body-rate control
-  //############################################################################
-  //############################## Environment #################################
-  // | P_rate |
+  // P gain for body-rate control (loaded from YAML per-platform)
+  Matrix<3, 3> Kinv_ang_vel_tau_ = Vector<3>(200, 200, 120).asDiagonal();
 
-
-  // Experiment1
-  // const Matrix<3, 3> Kinv_ang_vel_tau_ =Vector<3>(16.6, 16.6, 5.0).asDiagonal();
-
-  // Experiment2
-  // const Matrix<3, 3> Kinv_ang_vel_tau_ =Vector<3>(45, 45, 60).asDiagonal();
-
-  // Experiment3
-  const Matrix<3, 3> Kinv_ang_vel_tau_ =Vector<3>(200, 200, 120).asDiagonal();
-
-
-  //############################################################################
-  //############################################################################
   // gravity
   const Vector<3> gz_{0.0, 0.0, Gz};
 

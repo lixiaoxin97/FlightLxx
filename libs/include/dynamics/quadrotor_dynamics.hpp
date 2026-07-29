@@ -54,6 +54,7 @@ class QuadrotorDynamics : DynamicsBase {
   inline Scalar getMotorTauInv() const { return motor_tau_inv_; };
   inline Matrix<3, 3> getJ(void) const { return J_; };
   inline Matrix<3, 3> getJInv(void) const { return J_inv_; };
+  inline Matrix<3, 3> getPRate(void) const { return p_rate_.asDiagonal(); };
 
   bool setMass(const Scalar mass);
   bool setArmLength(const Scalar arm_length);
@@ -85,6 +86,9 @@ class QuadrotorDynamics : DynamicsBase {
 
   // Quadrotor limits
   Vector<3> omega_max_;
+
+  // P gain for body-rate controller
+  Vector<3> p_rate_;
 };
 
 }  // namespace flightlib
