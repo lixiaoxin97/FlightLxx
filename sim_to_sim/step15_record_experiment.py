@@ -61,6 +61,9 @@ CSV_FIELDS = {
     "rates_setpoint": PREFIX + ("timestamp", "roll", "pitch", "yaw", "thrust_x", "thrust_y", "thrust_z", "reset_integral"),
     "policy": PREFIX + (
         "controller_run_id", "tick", "status", "published", "setpoint_timestamp_us",
+        "heartbeat_published", "heartbeat_timestamp_us", "heartbeat_hz",
+        "control_authority", "ctbr_allowed", "px4_nav_state", "px4_arming_state",
+        "vehicle_status_age_ms", "control_mode_age_ms",
         "sequence", "new_action", "inference_submitted", "inference_count",
         "target_hz", "publish_hz", "infer_hz", "action_age_ms", "state_age_ms",
         "inference_ms", "latest_odometry_age_ms", "source_timestamp_us",
@@ -349,6 +352,9 @@ def self_test():
             dict(base, topic="/fmu/out/vehicle_status_v4", data={"nav_state":14,"arming_state":2}),
             dict(base, topic=TRACE_TOPIC, data={
                 "controller_run_id":"test", "published":True,
+                "heartbeat_published":True, "heartbeat_hz":50.0,
+                "control_authority":"offboard_control", "ctbr_allowed":True,
+                "px4_nav_state":14, "px4_arming_state":2,
                 "config":{
                     "thrust_model":{
                         "vehicle_mass_kg":2.0643, "motor_count":4,
@@ -386,6 +392,8 @@ def self_test():
         assert row["px4_thrust_fraction"] == "0.729"
         assert row["thrust_saturated_high"] == "False"
         assert row["thrust_model_max_acceleration_m_s2"] == "16.5645"
+        assert row["heartbeat_published"] == "True" and row["heartbeat_hz"] == "50.0"
+        assert row["control_authority"] == "offboard_control" and row["px4_nav_state"] == "14"
         assert clean_json({"bad":float("nan"),"a":[float("inf")]}) == {"bad":None,"a":[None]}
         archive = make_zip(directory)
         with zipfile.ZipFile(archive) as z:

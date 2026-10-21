@@ -53,6 +53,60 @@ the actual C++ training Euler expression. Controller startup and
 `policy_trace.config` record the contract version, rotation angle, and source
 hash so the next experiment can be distinguished from old runs.
 
+## Control ownership: PX4 native modes versus neural Offboard
+
+`--publish` now enables a mode-gated publisher. The controller continues
+inference for diagnostics while PX4 owns takeoff, native Hold/Loiter, and
+landing. Its startup command and independent terminal windows stay the same.
+
+| Controller/vehicle state | Offboard heartbeat | Neural CTBR setpoint |
+|---|---|---|
+| Dry run (without `--publish`) | No | No |
+| PX4 takeoff, native hover, landing | Yes, when inference/state/feedback are fresh | No |
+| Armed Offboard with body-rate control confirmed | Yes | Yes |
+| Missing/stale mode feedback or stale inference/odometry | No | No |
+| Offboard while disarmed or waiting for controller flags | Yes, when inputs are fresh | No |
+
+The node subscribes to `VehicleStatus` and `VehicleControlMode`. It requires
+`nav_state=OFFBOARD`, armed state, and confirmed Offboard rate control with
+the internal attitude controller disabled before sending
+`/fmu/in/vehicle_rates_setpoint`. Either feedback reporting exit from this
+mode stops CTBR on the following control tick. Detection follows received
+PX4 feedback; DDS transport and the control timer add transition latency.
+The default feedback timeout is 1.5 s (PX4 normally publishes these topics
+about twice per second). Missing feedback stops output; it never falls back
+to publishing neutral/zero CTBR during native PX4 control.
+
+Topic names follow the installed `px4_msgs` message version automatically,
+including `/fmu/out/vehicle_status_v4` on this machine. Override them with
+`--vehicle-status-topic` / `--vehicle-control-mode-topic` if namespaced.
+
+Only `OffboardControlMode` is streamed before handover, so you can still
+request Offboard after the heartbeat has been active for at least two seconds.
+PX4's ROS 2 heartbeat and actual control setpoints are separate; external
+setpoints must only be sent during Offboard to avoid overwriting internal
+setpoints. See the [PX4 Offboard control documentation](https://docs.px4.io/main/en/flight_modes/offboard#ros-2-offboard-control).
+
+In the controller window, `output=heartbeat_only` means no neural CTBR is sent;
+`output=published` means neural CTBR was actually sent. `CTBR_hz` should be
+zero during native PX4 modes, while `heartbeat_hz` remains near 50 Hz.
+`rates_frd` and `thrust_body` in inference logs are candidate actions; read the
+`output` field to determine whether they were sent. `policy.csv` now records
+heartbeat publication, mode authority, PX4 nav/arming state, and feedback
+ages separately from `published` (actual CTBR publication).
+
+Restart the old controller process to load this change. For PX4 landing,
+use `commander land` in the PX4 window as before; the controller can remain
+running and will gate off CTBR after receiving the mode transition.
+
+Offline regressions (no ROS messages sent):
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/px4_ros2_ws/install/setup.bash
+/usr/bin/python3 sim_to_sim/test_offboard_authority.py
+```
+
 ## CTBR thrust mapping
 
 `step08_px4_rates_contract.py` maps FlightLxx's fourth policy output to the
@@ -321,7 +375,8 @@ start the publishing controller with the same arguments plus `--publish`:
 
 Set `S2S_YAW_REFERENCE_RAD` to the printed value if it differs from zero.
 Leave this node running. Wait at least two seconds and check that its timing
-output shows fresh inference and publishing near the 50 Hz target before
+output shows fresh inference and heartbeat near 50 Hz with `CTBR_hz=0` and
+`output=heartbeat_only` before
 requesting Offboard mode.
 
 ### Terminal 6 — PX4 ROS checks and Offboard handover
@@ -386,8 +441,9 @@ and whether the controller policy trace was captured.
 If ROS 2 does not show `/fmu/out/vehicle_odometry`, check that the DDS Agent is
 running and PX4 reports `uxrce_dds_client` synchronized. If policy requests
 fail, confirm Terminal 3 is listening on `127.0.0.1:5800`. If Offboard is
-rejected, ensure Terminal 5 has been publishing fresh setpoints for at least
-one second and the vehicle has completed takeoff before retrying.
+rejected, ensure Terminal 5 shows `output=heartbeat_only` and has been sending
+fresh Offboard heartbeats for at least two seconds, both mode feedback topics
+are arriving, and the vehicle has completed takeoff before retrying.
 
 PX4's generated DDS topic names include message-version suffixes on this
 workspace (`vehicle_local_position_v1` and `vehicle_status_v4`). Discover the

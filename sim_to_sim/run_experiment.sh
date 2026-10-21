@@ -115,11 +115,15 @@ fi
 
 # Fail before takeoff if the PX4 message libraries are not available in this
 # environment. The controller window sources the same setup files separately.
-if ! "$ROS_PYTHON" - <<'PY'
+if ! "$ROS_PYTHON" - "$SCRIPT_DIR" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
-from px4_msgs.msg import OffboardControlMode, VehicleOdometry, VehicleRatesSetpoint
+from px4_msgs.msg import (OffboardControlMode, VehicleOdometry,
+                          VehicleRatesSetpoint, VehicleStatus, VehicleControlMode)
+from offboard_authority import px4_feedback_topic
 
 rclpy.init()
 node = Node("flightlxx_px4_typesupport_preflight")
@@ -127,6 +131,10 @@ qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.BEST_EFFORT,
                  durability=DurabilityPolicy.VOLATILE)
 node.create_subscription(VehicleOdometry, "/fmu/out/vehicle_odometry",
                          lambda message: None, qos)
+for message_class, base in ((VehicleStatus, "/fmu/out/vehicle_status"),
+                            (VehicleControlMode, "/fmu/out/vehicle_control_mode")):
+    node.create_subscription(message_class, px4_feedback_topic(base, message_class),
+                             lambda message: None, qos)
 node.create_publisher(OffboardControlMode, "/fmu/in/offboard_control_mode", 1)
 node.create_publisher(VehicleRatesSetpoint, "/fmu/in/vehicle_rates_setpoint", 1)
 node.destroy_node()
@@ -155,6 +163,8 @@ open_window_terminal() {
     tmux new-session -d -s "$view_session" -t "$SESSION"
     VIEW_SESSIONS+=("$view_session")
     tmux select-window -t "$view_session:$name"
+    # The wrapper intentionally expands $1 inside the child shell, not this one.
+    # shellcheck disable=SC2016
     if ! gnome-terminal --window --title="FlightLxx | $name" \
         --working-directory="$FLIGHTLXX_ROOT" -- bash -c '
             unset TMUX
@@ -237,8 +247,12 @@ wait_for_text() {
     local text="$2"
     local timeout_s="${3:-45}"
     local deadline=$((SECONDS + timeout_s))
+    local pane_text
     while (( SECONDS < deadline )); do
-        if tmux capture-pane -p -t "$SESSION:$window" -S -100 2>/dev/null | grep -Fq -- "$text"; then
+        # ROS log lines can wrap at the tmux pane width (e.g.
+        # "output=\nheartbeat_only"). Join lines before matching readiness.
+        pane_text="$(tmux capture-pane -p -t "$SESSION:$window" -S -100 2>/dev/null | tr '\n' ' ')"
+        if [[ "$pane_text" == *"$text"* ]]; then
             return 0
         fi
         sleep 1
@@ -454,8 +468,9 @@ sleep 1
 CONTROLLER_LIVE="$CONTROLLER_BASE --publish"
 tmux send-keys -t "$SESSION:controller" -l "$CONTROLLER_LIVE"
 tmux send-keys -t "$SESSION:controller" Enter
-wait_for_text controller 'request[' 60 || die 'publishing controller did not produce policy output'
-printf 'Publishing controller is active. It must remain running before Offboard is requested.\n'
+wait_for_text controller 'heartbeat_only' 60 || die 'controller did not confirm heartbeat-only readiness; check PX4 mode feedback'
+sleep 2
+printf 'Controller heartbeat is active; neural CTBR is withheld until PX4 confirms armed Offboard body-rate mode.\n'
 read -r -p 'When the x500 is still stable and controller output looks healthy, press Enter to request Offboard: ' _
 
 printf 'Requesting Offboard mode...\n'

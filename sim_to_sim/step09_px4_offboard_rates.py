@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Publish CTBR on a 50 Hz timer; run blocking UDP inference in one worker.
+"""Publish CTBR only in confirmed Offboard; run inference in one worker.
 
 Odometry callbacks only cache the latest state. Each control tick submits at
 most one inference job, then publishes the latest valid result (zero-order
-hold). Slow inference never queues jobs or blocks the ROS executor. Linux /
+hold). Outside Offboard only the OffboardControlMode heartbeat is published.
+Slow inference never queues jobs or blocks the ROS executor. Linux /
 Python / ROS timers provide a target period, not a hard real-time guarantee.
 """
 
@@ -20,6 +21,7 @@ import uuid
 
 from step06_policy_client import PolicyClient
 from step02_state_contract import STATE_CONTRACT_VERSION, wrap_angle_rad
+from offboard_authority import OffboardAuthority, px4_feedback_topic
 from step07_ros2_policy_bridge import message_to_observation
 from step08_px4_rates_contract import (
     DEFAULT_THRUST_MODEL,
@@ -39,6 +41,8 @@ try:
         OffboardControlMode,
         VehicleRatesSetpoint,
         VehicleOdometry,
+        VehicleStatus,
+        VehicleControlMode,
     )
 except ImportError:
     rclpy = None
@@ -184,6 +188,12 @@ def fill_px4_messages(
     thrust_body_frd,
 ):
     """Preserve the original CTBR message contract."""
+    fill_offboard_heartbeat(offboard_message, timestamp_us)
+    fill_rates_setpoint(rates_message, timestamp_us, rates_frd, thrust_body_frd)
+
+
+def fill_offboard_heartbeat(offboard_message, timestamp_us):
+    """Declare the intended control level without sending actuator demands."""
     offboard_message.timestamp = int(timestamp_us)
     offboard_message.position = False
     offboard_message.velocity = False
@@ -192,6 +202,10 @@ def fill_px4_messages(
     offboard_message.body_rate = True
     offboard_message.thrust_and_torque = False
     offboard_message.direct_actuator = False
+
+
+def fill_rates_setpoint(rates_message, timestamp_us, rates_frd, thrust_body_frd):
+    """Fill CTBR; callers must first verify PX4 granted Offboard control."""
     rates_message.timestamp = int(timestamp_us)
     rates_message.roll = float(rates_frd[0])
     rates_message.pitch = float(rates_frd[1])
@@ -218,6 +232,9 @@ if rclpy is not None:
             max_odometry_age=0.2,
             trace_enabled=True,
             thrust_model=None,
+            max_feedback_age=1.5,
+            vehicle_status_topic=None,
+            vehicle_control_mode_topic=None,
         ):
             super().__init__("flightlxx_px4_offboard_rates")
             self.physical_hover = tuple(physical_hover)
@@ -230,6 +247,13 @@ if rclpy is not None:
             self.publish_enabled = bool(publish_enabled)
             self.max_action_age = float(max_action_age)
             self.max_odometry_age = float(max_odometry_age)
+            self.authority = OffboardAuthority(max_feedback_age)
+            self.vehicle_status_topic = vehicle_status_topic or px4_feedback_topic(
+                "/fmu/out/vehicle_status", VehicleStatus
+            )
+            self.vehicle_control_mode_topic = vehicle_control_mode_topic or px4_feedback_topic(
+                "/fmu/out/vehicle_control_mode", VehicleControlMode
+            )
             self.thrust_model = dict(thrust_model or DEFAULT_THRUST_MODEL)
             self.thrust_model_max_acceleration = map_collective_acceleration(
                 0.0, **self.thrust_model
@@ -240,6 +264,10 @@ if rclpy is not None:
             self.last_error_time = 0.0
             self.message_count = 0
             self.publish_count = 0
+            self.heartbeat_count = 0
+            self.last_stats_heartbeat_count = 0
+            self.heartbeat_hz = 0.0
+            self.last_authority_status = None
             self.timer_count = 0
             self.last_stats_time = time.monotonic()
             self.last_stats_publish_count = 0
@@ -276,6 +304,10 @@ if rclpy is not None:
                     self.thrust_model_max_acceleration
                 ),
                 "publish_enabled": self.publish_enabled,
+                "control_authority_contract": "offboard_only_ctbr_v1",
+                "vehicle_status_topic": self.vehicle_status_topic,
+                "vehicle_control_mode_topic": self.vehicle_control_mode_topic,
+                "max_feedback_age_s": self.authority.max_feedback_age,
                 "policy_address": list(policy_client.server_address),
                 "policy_timeout_s": policy_client.timeout,
                 "model_path_hint": os.environ.get("S2S_MODEL"),
@@ -299,11 +331,24 @@ if rclpy is not None:
             self.subscription = self.create_subscription(
                 VehicleOdometry, topic, self.odometry_callback, qos
             )
+            self.vehicle_status_subscription = self.create_subscription(
+                VehicleStatus, self.vehicle_status_topic,
+                self.vehicle_status_callback, qos,
+            )
+            self.vehicle_control_mode_subscription = self.create_subscription(
+                VehicleControlMode, self.vehicle_control_mode_topic,
+                self.vehicle_control_mode_callback, qos,
+            )
+            # Depth one limits queued external commands at mode transitions.
+            command_qos = QoSProfile(
+                depth=1, reliability=ReliabilityPolicy.RELIABLE,
+                durability=DurabilityPolicy.VOLATILE,
+            )
             self.offboard_publisher = self.create_publisher(
-                OffboardControlMode, "/fmu/in/offboard_control_mode", 10
+                OffboardControlMode, "/fmu/in/offboard_control_mode", command_qos
             )
             self.rates_publisher = self.create_publisher(
-                VehicleRatesSetpoint, "/fmu/in/vehicle_rates_setpoint", 10
+                VehicleRatesSetpoint, "/fmu/in/vehicle_rates_setpoint", command_qos
             )
             self.trace_publisher = None
             if self.trace_enabled:
@@ -338,6 +383,11 @@ if rclpy is not None:
                 % (STATE_CONTRACT_VERSION, self.trace_config["world_yaw_rotation_rad"])
             )
             self.get_logger().info(
+                "CTBR requires armed Offboard body-rate control; feedback: %s and %s; "
+                "native PX4 modes receive heartbeat only"
+                % (self.vehicle_status_topic, self.vehicle_control_mode_topic)
+            )
+            self.get_logger().info(
                 "control timer=%.3f Hz (%.3f ms), publish=%s; "
                 "max_action_age=%.3f s, max_odometry_age=%.3f s"
                 % (
@@ -365,31 +415,50 @@ if rclpy is not None:
             self.latest_odometry = message
             self.latest_odometry_time = time.monotonic()
 
-        def _publish_setpoint(self, rates_frd, thrust_body_frd):
+        def vehicle_status_callback(self, message):
+            self.authority.update_status(message, time.monotonic())
+
+        def vehicle_control_mode_callback(self, message):
+            self.authority.update_control_mode(message, time.monotonic())
+
+        def _publish_control(self, result, now):
+            """One publication path: heartbeat first, mode-gated CTBR second."""
+            if not self.publish_enabled:
+                return None, None, "dry_run"
+            authority = self.authority.decision(now)
+            if authority.status != self.last_authority_status:
+                self.get_logger().info(
+                    "control_authority=%s; heartbeat=%s; neural_CTBR=%s"
+                    % (authority.status, authority.heartbeat, authority.rates)
+                )
+                self.last_authority_status = authority.status
+            if not authority.heartbeat:
+                return None, None, authority.status
             timestamp_us = self.get_clock().now().nanoseconds // 1000
             offboard_message = OffboardControlMode()
-            rates_message = VehicleRatesSetpoint()
-            fill_px4_messages(
-                offboard_message,
-                rates_message,
-                timestamp_us,
-                rates_frd,
-                thrust_body_frd,
-            )
+            fill_offboard_heartbeat(offboard_message, timestamp_us)
             self.offboard_publisher.publish(offboard_message)
+            self.heartbeat_count += 1
+            if not authority.rates:
+                return None, timestamp_us, authority.status
+            rates_message = VehicleRatesSetpoint()
+            fill_rates_setpoint(rates_message, timestamp_us,
+                                result.rates_frd, result.thrust_body_frd)
             self.rates_publisher.publish(rates_message)
             self.publish_count += 1
-            return timestamp_us
+            return timestamp_us, timestamp_us, "published"
 
         def _emit_trace(
             self, now, result, status, inference_count,
             submitted=False, error=None, output_timestamp_us=None,
             submitted_observation=None, submitted_source_odometry=None,
+            heartbeat_timestamp_us=None,
         ):
             """Best-effort telemetry only; no file I/O or inference here."""
             if self.trace_publisher is None:
                 return
             try:
+                authority = self.authority.decision(now)
                 data = {
                     "schema_version": 1, "event": "policy_tick",
                     "controller_run_id": self.controller_run_id,
@@ -397,6 +466,27 @@ if rclpy is not None:
                     "control_monotonic_s": now,
                     "published": output_timestamp_us is not None,
                     "setpoint_timestamp_us": output_timestamp_us,
+                    "heartbeat_published": heartbeat_timestamp_us is not None,
+                    "heartbeat_timestamp_us": heartbeat_timestamp_us,
+                    "heartbeat_hz": self.heartbeat_hz,
+                    "control_authority": authority.status,
+                    "ctbr_allowed": authority.rates,
+                    "px4_nav_state": (
+                        self.authority.vehicle_status.nav_state
+                        if self.authority.vehicle_status is not None else None
+                    ),
+                    "px4_arming_state": (
+                        self.authority.vehicle_status.arming_state
+                        if self.authority.vehicle_status is not None else None
+                    ),
+                    "vehicle_status_age_ms": (
+                        1000.0 * (now - self.authority.status_received_at)
+                        if self.authority.status_received_at is not None else None
+                    ),
+                    "control_mode_age_ms": (
+                        1000.0 * (now - self.authority.control_mode_received_at)
+                        if self.authority.control_mode_received_at is not None else None
+                    ),
                     "inference_submitted": bool(submitted),
                     "submitted_observation": (
                         list(submitted_observation) if submitted else None
@@ -483,16 +573,21 @@ if rclpy is not None:
                 self.infer_hz = (
                     inference_count - self.last_stats_inference_count
                 ) / elapsed
+                self.heartbeat_hz = (
+                    self.heartbeat_count - self.last_stats_heartbeat_count
+                ) / elapsed
                 self.last_stats_time = now
                 self.last_stats_publish_count = self.publish_count
                 self.last_stats_inference_count = inference_count
+                self.last_stats_heartbeat_count = self.heartbeat_count
                 self.get_logger().info(
-                    "timing: target_hz=%.2f publish_hz=%.2f infer_hz=%.2f "
+                    "timing: target_hz=%.2f CTBR_hz=%.2f infer_hz=%.2f heartbeat_hz=%.2f "
                     "published=%d, PX4 messages=%d"
                     % (
                         self.control_rate,
                         self.publish_hz,
                         self.infer_hz,
+                        self.heartbeat_hz,
                         self.publish_count,
                         self.message_count,
                     )
@@ -557,15 +652,14 @@ if rclpy is not None:
                     "no fresh policy action; CTBR and Offboard heartbeat paused"
                 )
                 return
-            output_timestamp_us = None
-            if self.publish_enabled:
-                output_timestamp_us = self._publish_setpoint(
-                    result.rates_frd, result.thrust_body_frd
-                )
+            output_timestamp_us, heartbeat_timestamp_us, output_status = (
+                self._publish_control(result, now)
+            )
             self._emit_trace(
-                now, result, "published" if self.publish_enabled else "dry_run",
+                now, result, output_status,
                 inference_count, submitted=submitted, error=worker_error,
                 output_timestamp_us=output_timestamp_us,
+                heartbeat_timestamp_us=heartbeat_timestamp_us,
                 submitted_observation=observation,
                 submitted_source_odometry=source_odometry,
             )
@@ -577,7 +671,7 @@ if rclpy is not None:
                 "request[%d], raw=%s, rates_frd=%s, thrust_body=%s, "
                 "collective=%.4f m/s^2, rotor_speed=%.1f rad/s, "
                 "thrust_sat=(low:%s high:%s), action_age_ms=%.2f, "
-                "state_age_ms=%.2f, inference_ms=%.2f"
+                "state_age_ms=%.2f, inference_ms=%.2f, output=%s"
                 % (
                     result.sequence,
                     tuple(round(value, 5) for value in result.raw_action),
@@ -590,6 +684,8 @@ if rclpy is not None:
                     1000.0 * (now - result.completed_at),
                     1000.0 * (now - result.observation_time),
                     1000.0 * (result.completed_at - result.started_at),
+                    ("heartbeat_only" if heartbeat_timestamp_us is not None
+                     and output_timestamp_us is None else output_status),
                 )
             )
 
@@ -632,6 +728,14 @@ def parse_args():
     parser.add_argument("--policy-timeout", type=positive_float, default=1.0)
     parser.add_argument("--max-action-age", type=positive_float, default=0.2)
     parser.add_argument("--max-odometry-age", type=positive_float, default=0.2)
+    parser.add_argument(
+        "--max-feedback-age", type=positive_float, default=1.5,
+        help="maximum VehicleStatus/VehicleControlMode receive age in seconds",
+    )
+    parser.add_argument("--vehicle-status-topic", default=None,
+                        help="override the installed message-version-derived status topic")
+    parser.add_argument("--vehicle-control-mode-topic", default=None,
+                        help="override the installed message-version-derived control-mode topic")
     add_thrust_model_arguments(parser)
     parser.add_argument(
         "--no-policy-trace", action="store_true",
@@ -639,7 +743,7 @@ def parse_args():
     )
     parser.add_argument(
         "--publish", action="store_true",
-        help="actually publish OffboardControlMode and VehicleRatesSetpoint",
+        help="enable Offboard heartbeat; CTBR is sent only in confirmed armed Offboard body-rate mode",
     )
     args = parser.parse_args()
     try:
@@ -680,6 +784,9 @@ def main():
             max_odometry_age=args.max_odometry_age,
             trace_enabled=not args.no_policy_trace,
             thrust_model=args.thrust_model,
+            max_feedback_age=args.max_feedback_age,
+            vehicle_status_topic=args.vehicle_status_topic,
+            vehicle_control_mode_topic=args.vehicle_control_mode_topic,
         )
         rclpy.spin(node)
     except KeyboardInterrupt:
