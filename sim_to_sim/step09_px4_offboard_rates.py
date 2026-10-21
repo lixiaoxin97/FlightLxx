@@ -19,8 +19,16 @@ import time
 import uuid
 
 from step06_policy_client import PolicyClient
+from step02_state_contract import STATE_CONTRACT_VERSION, wrap_angle_rad
 from step07_ros2_policy_bridge import message_to_observation
-from step08_px4_rates_contract import raw_action_to_px4_rates_setpoint
+from step08_px4_rates_contract import (
+    DEFAULT_THRUST_MODEL,
+    ThrustMapping,
+    add_thrust_model_arguments,
+    convert_raw_action_to_px4,
+    map_collective_acceleration,
+    thrust_model_from_args,
+)
 
 try:
     import rclpy
@@ -49,6 +57,7 @@ class PolicyResult:
     completed_at: float
     observation: tuple = ()
     source_odometry: dict = None
+    thrust_mapping: ThrustMapping = None
 
 
 def result_is_fresh(result, now, max_action_age, max_odometry_age):
@@ -63,9 +72,10 @@ def result_is_fresh(result, now, max_action_age, max_odometry_age):
 class PolicyWorker:
     """Own the UDP client on one thread; reject submissions while busy."""
 
-    def __init__(self, client, client_factory=None):
+    def __init__(self, client, client_factory=None, thrust_model=None):
         self._client = client
         self._client_factory = client_factory
+        self._thrust_model = dict(thrust_model or DEFAULT_THRUST_MODEL)
         self._timeout = client.timeout
         self._lock = threading.Lock()
         self._wake = threading.Event()
@@ -123,8 +133,10 @@ class PolicyWorker:
                     action = tuple(
                         self._client.infer(observation, sequence=sequence)
                     )
-                    rates, thrust, collective = raw_action_to_px4_rates_setpoint(
-                        action
+                    rates, thrust, collective, thrust_mapping = (
+                        convert_raw_action_to_px4(
+                            action, **self._thrust_model
+                        )
                     )
                     result = PolicyResult(
                         sequence=sequence,
@@ -137,6 +149,7 @@ class PolicyWorker:
                         completed_at=time.monotonic(),
                         observation=observation,
                         source_odometry=source_odometry,
+                        thrust_mapping=thrust_mapping,
                     )
                     with self._lock:
                         self._result = result
@@ -204,6 +217,7 @@ if rclpy is not None:
             max_action_age=0.2,
             max_odometry_age=0.2,
             trace_enabled=True,
+            thrust_model=None,
         ):
             super().__init__("flightlxx_px4_offboard_rates")
             self.physical_hover = tuple(physical_hover)
@@ -216,6 +230,10 @@ if rclpy is not None:
             self.publish_enabled = bool(publish_enabled)
             self.max_action_age = float(max_action_age)
             self.max_odometry_age = float(max_odometry_age)
+            self.thrust_model = dict(thrust_model or DEFAULT_THRUST_MODEL)
+            self.thrust_model_max_acceleration = map_collective_acceleration(
+                0.0, **self.thrust_model
+            ).maximum_acceleration_m_s2
             self.latest_odometry = None
             self.latest_odometry_time = 0.0
             self.last_print_time = 0.0
@@ -240,8 +258,23 @@ if rclpy is not None:
                 "nn_goal": self.nn_goal,
                 "physical_yaw_reference": self.physical_yaw_reference,
                 "nn_yaw_goal": self.nn_yaw_goal,
+                "state_contract_version": STATE_CONTRACT_VERSION,
+                "state_contract_sha256": hashlib.sha256(
+                    Path(__file__).with_name("step02_state_contract.py").read_bytes()
+                ).hexdigest(),
+                "world_yaw_rotation_rad": wrap_angle_rad(
+                    self.nn_yaw_goal - self.physical_yaw_reference
+                ),
+                "world_transform": "p=Rz(alpha)*(p_flu-hover)+goal; "
+                                   "v=Rz(alpha)*v_flu; R=Rz(alpha)*R_flu",
+                "attitude_encoding": "Eigen eulerAngles(2,1,0); yaw in [0,pi]",
+                "body_rate_transform": "FRD->FLU only; independent of world yaw",
                 "max_action_age_s": self.max_action_age,
                 "max_odometry_age_s": self.max_odometry_age,
+                "thrust_model": self.thrust_model,
+                "thrust_model_max_acceleration_m_s2": (
+                    self.thrust_model_max_acceleration
+                ),
                 "publish_enabled": self.publish_enabled,
                 "policy_address": list(policy_client.server_address),
                 "policy_timeout_s": policy_client.timeout,
@@ -289,6 +322,7 @@ if rclpy is not None:
                 client_factory=lambda: PolicyClient(
                     address[0], address[1], timeout=timeout
                 ),
+                thrust_model=self.thrust_model,
             )
             # ROS callbacks stay short: this timer never performs UDP I/O.
             self.control_timer = self.create_timer(
@@ -297,6 +331,11 @@ if rclpy is not None:
             self.get_logger().info(
                 "subscribed to %s; policy udp=%s:%d"
                 % (topic, address[0], address[1])
+            )
+            self.get_logger().info(
+                "state_contract=%s; world_yaw_rotation=%.6f rad; "
+                "policy attitude uses training Eigen ZYX branch"
+                % (STATE_CONTRACT_VERSION, self.trace_config["world_yaw_rotation_rad"])
             )
             self.get_logger().info(
                 "control timer=%.3f Hz (%.3f ms), publish=%s; "
@@ -389,6 +428,25 @@ if rclpy is not None:
                         "rates_frd": list(result.rates_frd),
                         "thrust_body_frd": list(result.thrust_body_frd),
                         "collective_log_m_s2": result.collective_thrust,
+                        "thrust_mapping": {
+                            "px4_fraction": (
+                                result.thrust_mapping.px4_thrust_fraction
+                            ),
+                            "motor_output_fraction": (
+                                result.thrust_mapping.motor_output_fraction
+                            ),
+                            "motor_speed_rad_s": (
+                                result.thrust_mapping.motor_speed_rad_s
+                            ),
+                            "minimum_acceleration_m_s2": (
+                                result.thrust_mapping.minimum_acceleration_m_s2
+                            ),
+                            "maximum_acceleration_m_s2": (
+                                result.thrust_mapping.maximum_acceleration_m_s2
+                            ),
+                            "saturated_low": result.thrust_mapping.saturated_low,
+                            "saturated_high": result.thrust_mapping.saturated_high,
+                        },
                         "observation_monotonic_s": result.observation_time,
                         "started_monotonic_s": result.started_at,
                         "completed_monotonic_s": result.completed_at,
@@ -517,7 +575,8 @@ if rclpy is not None:
             # Keep request[...] and raw= for the launcher's ready detection.
             self.get_logger().info(
                 "request[%d], raw=%s, rates_frd=%s, thrust_body=%s, "
-                "collective=%.4f m/s^2, action_age_ms=%.2f, "
+                "collective=%.4f m/s^2, rotor_speed=%.1f rad/s, "
+                "thrust_sat=(low:%s high:%s), action_age_ms=%.2f, "
                 "state_age_ms=%.2f, inference_ms=%.2f"
                 % (
                     result.sequence,
@@ -525,6 +584,9 @@ if rclpy is not None:
                     tuple(round(value, 5) for value in result.rates_frd),
                     tuple(round(value, 5) for value in result.thrust_body_frd),
                     result.collective_thrust,
+                    result.thrust_mapping.motor_speed_rad_s,
+                    result.thrust_mapping.saturated_low,
+                    result.thrust_mapping.saturated_high,
                     1000.0 * (now - result.completed_at),
                     1000.0 * (now - result.observation_time),
                     1000.0 * (result.completed_at - result.started_at),
@@ -552,8 +614,14 @@ def parse_args():
     parser.add_argument(
         "--nn-goal", type=float, nargs=3, default=(0.0, 0.0, 5.0)
     )
-    parser.add_argument("--physical-yaw-reference", type=float, default=0.0)
-    parser.add_argument("--nn-yaw-goal", type=float, default=0.0)
+    parser.add_argument(
+        "--physical-yaw-reference", type=float, default=0.0,
+        help="fixed physical FLU heading; rotates world attitude, position error, and velocity together",
+    )
+    parser.add_argument(
+        "--nn-yaw-goal", type=float, default=0.0,
+        help="network heading used in the same fixed world-frame rotation",
+    )
     parser.add_argument(
         "--control-rate", "--max-rate", dest="max_rate", type=positive_float,
         default=50.0,
@@ -564,6 +632,7 @@ def parse_args():
     parser.add_argument("--policy-timeout", type=positive_float, default=1.0)
     parser.add_argument("--max-action-age", type=positive_float, default=0.2)
     parser.add_argument("--max-odometry-age", type=positive_float, default=0.2)
+    add_thrust_model_arguments(parser)
     parser.add_argument(
         "--no-policy-trace", action="store_true",
         help="disable diagnostic policy telemetry (enabled by default)",
@@ -572,7 +641,12 @@ def parse_args():
         "--publish", action="store_true",
         help="actually publish OffboardControlMode and VehicleRatesSetpoint",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    try:
+        args.thrust_model = thrust_model_from_args(args)
+    except ValueError as exc:
+        parser.error(str(exc))
+    return args
 
 
 def main():
@@ -605,6 +679,7 @@ def main():
             max_action_age=args.max_action_age,
             max_odometry_age=args.max_odometry_age,
             trace_enabled=not args.no_policy_trace,
+            thrust_model=args.thrust_model,
         )
         rclpy.spin(node)
     except KeyboardInterrupt:

@@ -27,11 +27,14 @@ except ImportError:
 if rclpy is not None:
 
     class OdometryListener(Node):
-        def __init__(self, topic, physical_hover, nn_goal):
+        def __init__(self, topic, physical_hover, nn_goal,
+                     physical_yaw_reference=0.0, nn_yaw_goal=0.0):
             super().__init__("flightlxx_odometry_listener")
 
             self.physical_hover = tuple(physical_hover)
             self.nn_goal = tuple(nn_goal)
+            self.physical_yaw_reference = float(physical_yaw_reference)
+            self.nn_yaw_goal = float(nn_yaw_goal)
             self.last_print_time = 0.0
             self.message_count = 0
 
@@ -65,6 +68,8 @@ if rclpy is not None:
                     angular_velocity_frd=message.angular_velocity,
                     physical_hover=self.physical_hover,
                     nn_goal=self.nn_goal,
+                    physical_yaw_reference=self.physical_yaw_reference,
+                    nn_yaw_goal=self.nn_yaw_goal,
                 )
             except (TypeError, ValueError) as exc:
                 self.get_logger().warning(
@@ -114,6 +119,8 @@ def main():
         default=(0.0, 0.0, 5.0),
     )
 
+    parser.add_argument("--physical-yaw-reference", type=float, default=0.0)
+    parser.add_argument("--nn-yaw-goal", type=float, default=0.0)
     args = parser.parse_args()
 
     if rclpy is None:
@@ -129,6 +136,8 @@ def main():
         topic=args.topic,
         physical_hover=args.physical_hover,
         nn_goal=args.nn_goal,
+        physical_yaw_reference=args.physical_yaw_reference,
+        nn_yaw_goal=args.nn_yaw_goal,
     )
 
     try:

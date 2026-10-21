@@ -38,7 +38,7 @@ except ImportError:
 
 TRACE_TOPIC = "/flightlxx/sim_to_sim/policy_trace"
 TOPIC_PATTERN = re.compile(
-    r"^/fmu/(?:in|out)/(?:vehicle_odometry|vehicle_rates_setpoint|"
+    r"^/fmu/(?:in|out)/(?:vehicle_odometry|vehicle_local_position|vehicle_rates_setpoint|"
     r"offboard_control_mode|vehicle_status|vehicle_control_mode|"
     r"vehicle_command|vehicle_command_ack|vehicle_land_detected|"
     r"failsafe_flags|vehicle_angular_velocity|vehicle_torque_setpoint|"
@@ -53,6 +53,11 @@ CSV_FIELDS = {
         + tuple("q_wxyz_" + str(i) for i in range(4))
         + tuple("velocity_" + str(i) for i in range(3))
         + tuple("angular_velocity_frd_" + str(i) for i in range(3)),
+    "local_position": PREFIX + (
+        "timestamp", "timestamp_sample", "xy_valid", "z_valid",
+        "v_xy_valid", "v_z_valid", "x", "y", "z", "vx", "vy", "vz",
+        "ax", "ay", "az", "heading",
+    ),
     "rates_setpoint": PREFIX + ("timestamp", "roll", "pitch", "yaw", "thrust_x", "thrust_y", "thrust_z", "reset_integral"),
     "policy": PREFIX + (
         "controller_run_id", "tick", "status", "published", "setpoint_timestamp_us",
@@ -61,6 +66,13 @@ CSV_FIELDS = {
         "inference_ms", "latest_odometry_age_ms", "source_timestamp_us",
         "source_timestamp_sample_us", "source_reset_counter", "source_pose_frame",
         "source_velocity_frame", "collective_log_m_s2", "error",
+        "px4_thrust_fraction", "motor_output_fraction", "motor_speed_rad_s",
+        "minimum_acceleration_m_s2", "maximum_acceleration_m_s2",
+        "thrust_saturated_low", "thrust_saturated_high",
+        "thrust_model_vehicle_mass_kg", "thrust_model_motor_count",
+        "thrust_model_motor_thrust_coefficient", "thrust_model_motor_omega_min",
+        "thrust_model_motor_omega_max", "thrust_model_thrust_model_factor",
+        "thrust_model_max_acceleration_m_s2",
     ) + tuple("obs_" + x for x in OBS_NAMES)
         + tuple("action_" + str(i) for i in range(4))
         + ("rate_sp_roll", "rate_sp_pitch", "rate_sp_yaw", "thrust_sp_x", "thrust_sp_y", "thrust_sp_z"),
@@ -102,6 +114,30 @@ def csv_row(event):
         source = result.get("source_odometry")
         source = source if isinstance(source, dict) else {}
         row.update({"source_" + k + ("_us" if k in ("timestamp", "timestamp_sample") else ""): v for k, v in source.items()})
+        mapping = result.get("thrust_mapping")
+        if isinstance(mapping, dict):
+            row.update({
+                "px4_thrust_fraction": mapping.get("px4_fraction"),
+                "motor_output_fraction": mapping.get("motor_output_fraction"),
+                "motor_speed_rad_s": mapping.get("motor_speed_rad_s"),
+                "minimum_acceleration_m_s2": mapping.get(
+                    "minimum_acceleration_m_s2"
+                ),
+                "maximum_acceleration_m_s2": mapping.get(
+                    "maximum_acceleration_m_s2"
+                ),
+                "thrust_saturated_low": mapping.get("saturated_low"),
+                "thrust_saturated_high": mapping.get("saturated_high"),
+            })
+        config = data.get("config")
+        config = config if isinstance(config, dict) else {}
+        thrust_model = config.get("thrust_model")
+        if isinstance(thrust_model, dict):
+            row.update({"thrust_model_" + k: v for k, v in thrust_model.items()})
+        if "thrust_model_max_acceleration_m_s2" in config:
+            row["thrust_model_max_acceleration_m_s2"] = config[
+                "thrust_model_max_acceleration_m_s2"
+            ]
         for names, values in (
             (["obs_" + x for x in OBS_NAMES], result.get("observation", [])),
             (["action_" + str(i) for i in range(4)], result.get("raw_action", [])),
@@ -116,6 +152,8 @@ def csv_row(event):
         for key, label in (("position", "position"), ("q", "q_wxyz"), ("velocity", "velocity"), ("angular_velocity", "angular_velocity_frd")):
             row.update({label + "_" + str(i): v for i, v in enumerate(data.get(key, []))})
         return "odometry", row
+    if base == "vehicle_local_position":
+        return "local_position", row
     if base == "vehicle_rates_setpoint":
         row.update(zip(("thrust_x", "thrust_y", "thrust_z"), data.get("thrust_body", [])))
         return "rates_setpoint", row
@@ -307,22 +345,53 @@ def self_test():
         base = dict(receive_wall_ns=1, receive_monotonic_ns=2, receive_ros_ns=3)
         events = [
             dict(base, topic="/fmu/out/vehicle_odometry", data={"position":[1,2,3],"q":[1,0,0,0],"velocity":[0,0,0],"angular_velocity":[0,0,0]}),
+            dict(base, topic="/fmu/out/vehicle_local_position", data={"x":1.0,"y":2.0,"z":-5.0,"vx":0.1,"vy":0.2,"vz":0.0,"xy_valid":True,"z_valid":True}),
             dict(base, topic="/fmu/out/vehicle_status_v4", data={"nav_state":14,"arming_state":2}),
-            dict(base, topic=TRACE_TOPIC, data={"controller_run_id":"test","published":True,"result":{"sequence":7,"observation":list(range(12)),"raw_action":[0,0,0,0],"source_odometry":{"timestamp_sample":123}}}),
+            dict(base, topic=TRACE_TOPIC, data={
+                "controller_run_id":"test", "published":True,
+                "config":{
+                    "thrust_model":{
+                        "vehicle_mass_kg":2.0643, "motor_count":4,
+                        "motor_thrust_coefficient":8.54858e-6,
+                        "motor_omega_min":150.0, "motor_omega_max":1000.0,
+                        "thrust_model_factor":0.0,
+                    },
+                    "thrust_model_max_acceleration_m_s2":16.5645,
+                },
+                "result":{
+                    "sequence":7, "observation":list(range(12)),
+                    "raw_action":[0,0,0,0],
+                    "source_odometry":{"timestamp_sample":123},
+                    "thrust_mapping":{
+                        "px4_fraction":0.729,
+                        "motor_output_fraction":0.729,
+                        "motor_speed_rad_s":769.5,
+                        "minimum_acceleration_m_s2":0.373,
+                        "maximum_acceleration_m_s2":16.5645,
+                        "saturated_low":False, "saturated_high":False,
+                    },
+                },
+            }),
         ]
         for event in events:
             assert writer.submit(clean_json(event))
         assert writer.close() and writer.error is None
         assert sum(writer.written.values()) == len(events)
+        with (directory/"local_position.csv").open() as stream:
+            row = next(csv.DictReader(stream))
+        assert row["z"] == "-5.0" and row["xy_valid"] == "True"
         with (directory/"policy.csv").open() as stream:
             row = next(csv.DictReader(stream))
         assert row["sequence"] == "7" and row["obs_wz"] == "11" and row["source_timestamp_sample_us"] == "123"
+        assert row["px4_thrust_fraction"] == "0.729"
+        assert row["thrust_saturated_high"] == "False"
+        assert row["thrust_model_max_acceleration_m_s2"] == "16.5645"
         assert clean_json({"bad":float("nan"),"a":[float("inf")]}) == {"bad":None,"a":[None]}
         archive = make_zip(directory)
         with zipfile.ZipFile(archive) as z:
             assert z.testzip() is None and "example/events.jsonl" in z.namelist()
         assert not writer.submit(events[0]) and writer.dropped == 1
-    print("step15 self-test: PASS (JSONL, CSV, policy sequence, nonfinite values, shutdown, ZIP)")
+    print("step15 self-test: PASS (JSONL, CSV, local position, policy sequence, nonfinite values, shutdown, ZIP)")
 
 
 def main():
