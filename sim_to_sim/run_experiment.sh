@@ -2,6 +2,8 @@
 
 # Launch and supervise one PX4/Gazebo x500 sim-to-sim experiment.
 # The dry-run and Offboard handover intentionally require operator confirmation.
+# Each process gets an independently controlled desktop terminal. tmux remains
+# the backend so the launcher can send PX4 commands and supervise shutdown.
 
 set -Eeuo pipefail
 
@@ -15,7 +17,9 @@ POLICY_PYTHON="${S2S_POLICY_PYTHON:-$HOME/anaconda3/envs/flightlxx3.8/bin/python
 MODEL_PATH="${S2S_MODEL:-$FLIGHTLXX_ROOT/Simulation_Experiments/models/CTBR+ID.zip}"
 POLICY_PORT="${S2S_POLICY_PORT:-5800}"
 TAKEOFF_ALT_M="${S2S_TAKEOFF_ALT_M:-5}"
+TERMINAL_MODE="${S2S_TERMINAL_MODE:-windows}"
 SESSION="flightlxx_s2s_$$"
+VIEW_SESSIONS=()
 
 SESSION_CREATED=0
 TAKEOFF_REQUESTED=0
@@ -30,9 +34,17 @@ usage() {
     cat <<'EOF'
 Usage: sim_to_sim/run_experiment.sh
 
-Starts the x500 SITL experiment in a tmux session. The launcher waits for a
-stable takeoff, runs the policy in dry-run, and asks before enabling policy
-control. Press Enter at the final prompt to request PX4 landing.
+Opens separate interactive GNOME Terminal windows for the DDS Agent, policy
+server, PX4/Gazebo, recorder, and controller. Each window has its own tmux
+view: selecting a window in one terminal does not switch the other terminals.
+Use the original launcher terminal for the dry-run/Offboard confirmations.
+PX4 commands can be typed at pxh>; Ctrl+C stops a foreground process and
+returns to its shell. After normal cleanup, desktop terminals stay open with
+an interactive shell. Closing a terminal detaches its view; it does not stop
+the experiment. Use the launcher's final Enter prompt or Ctrl+C to land.
+
+The launcher waits for a stable takeoff, runs the policy in dry-run, and asks
+before enabling policy control. Press Enter at the final prompt to land.
 
 Optional environment overrides:
   S2S_PX4_DIR           PX4-Autopilot path (default: ~/PX4-Autopilot)
@@ -43,6 +55,7 @@ Optional environment overrides:
   S2S_MODEL             PPO model path (default: CTBR+ID.zip)
   S2S_POLICY_PORT       Local UDP policy port (default: 5800)
   S2S_TAKEOFF_ALT_M     PX4 takeoff altitude in meters (default: 5)
+  S2S_TERMINAL_MODE     windows (default) or tmux (for headless/manual attach)
 EOF
 }
 
@@ -57,6 +70,17 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
 fi
 [[ $# -eq 0 ]] || die "unexpected argument: $1 (see --help)"
 [[ -t 0 ]] || die "run this script from an interactive terminal"
+
+case "$TERMINAL_MODE" in
+    windows)
+        [[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]] || \
+            die "no graphical desktop detected; run on the Ubuntu desktop or set S2S_TERMINAL_MODE=tmux"
+        command -v gnome-terminal >/dev/null 2>&1 || \
+            die "gnome-terminal is required for separate windows; install it or set S2S_TERMINAL_MODE=tmux"
+        ;;
+    tmux) ;;
+    *) die "S2S_TERMINAL_MODE must be windows or tmux" ;;
+esac
 
 for required in tmux timeout awk grep pgrep seq sed tail; do
     command -v "$required" >/dev/null 2>&1 || die "required command not found: $required"
@@ -117,15 +141,40 @@ if tmux has-session -t "$SESSION" 2>/dev/null; then
     die "tmux session already exists: $SESSION"
 fi
 
-tmux new-session -d -s "$SESSION" -n console
+tmux new-session -d -s "$SESSION" -n console 'bash --noprofile --norc -i'
 SESSION_CREATED=1
+
+open_window_terminal() {
+    local name="$1"
+    local view_session="${SESSION}_view_${name}"
+    [[ "$TERMINAL_MODE" == "windows" ]] || return 0
+
+    # Grouped sessions share the process windows, but each session has its own
+    # selected window. Attaching every terminal directly to SESSION would make
+    # a selection in one terminal switch all the others as well.
+    tmux new-session -d -s "$view_session" -t "$SESSION"
+    VIEW_SESSIONS+=("$view_session")
+    tmux select-window -t "$view_session:$name"
+    if ! gnome-terminal --window --title="FlightLxx | $name" \
+        --working-directory="$FLIGHTLXX_ROOT" -- bash -c '
+            unset TMUX
+            tmux attach-session -t "$1"
+            printf "\nFlightLxx terminal detached. If the experiment is still running, reconnect with:\n  tmux attach -t %s\n\n" "$1"
+            exec bash -i
+        ' bash "$view_session"; then
+        die "could not open the $name terminal; check the graphical desktop"
+    fi
+}
 
 new_window() {
     local name="$1"
     local command="$2"
-    tmux new-window -d -t "$SESSION" -n "$name"
+    # Keep a real interactive Bash parent: service commands must not use exec,
+    # otherwise Ctrl+C would destroy the pane instead of returning to a shell.
+    tmux new-window -d -t "$SESSION" -n "$name" 'bash --noprofile --norc -i'
     tmux send-keys -t "$SESSION:$name" -l "$command"
     tmux send-keys -t "$SESSION:$name" Enter
+    open_window_terminal "$name"
 }
 
 send_px4() {
@@ -317,6 +366,12 @@ cleanup() {
                 stop_window agent || true
             fi
             sleep 1
+            # Kill only this experiment's view sessions, not other tmux work.
+            # The desktop terminal wrapper then returns to interactive Bash.
+            local view_session
+            for view_session in "${VIEW_SESSIONS[@]}"; do
+                tmux kill-session -t "$view_session" 2>/dev/null || true
+            done
             tmux kill-session -t "$SESSION" 2>/dev/null || true
             printf 'Experiment processes stopped. Recorder output is under %s/sim_to_sim/logs/.\n' "$FLIGHTLXX_ROOT"
         fi
@@ -330,31 +385,28 @@ trap 'exit 143' TERM
 
 printf 'Starting FlightLxx sim-to-sim experiment.\n'
 printf 'PX4: %s\nModel: %s\nTmux session: %s\n' "$PX4_DIR" "$MODEL_PATH" "$SESSION"
+printf 'Terminal mode: %s. Use this launcher terminal for confirmations.\n' "$TERMINAL_MODE"
 
 if pgrep -x MicroXRCEAgent >/dev/null 2>&1; then
     printf 'An existing MicroXRCEAgent process was found; reusing it.\n'
-    new_window agent 'echo "Using the existing MicroXRCEAgent process"; exec bash'
+    new_window agent "source $(printf '%q' "$ROS_SETUP") && source $(printf '%q' "$ROS2_WS_SETUP") && echo 'Using the existing MicroXRCEAgent process. This is a ROS shell; the Agent remains in its original terminal.'"
 else
     AGENT_OWNED=1
-    new_window agent "source $(printf '%q' "$ROS_SETUP") && source $(printf '%q' "$ROS2_WS_SETUP") && exec MicroXRCEAgent udp4 -p 8888"
+    new_window agent "source $(printf '%q' "$ROS_SETUP") && source $(printf '%q' "$ROS2_WS_SETUP") && MicroXRCEAgent udp4 -p 8888"
 fi
 
-new_window policy "cd $(printf '%q' "$FLIGHTLXX_ROOT") && exec $(printf '%q' "$POLICY_PYTHON") $(printf '%q' "$FLIGHTLXX_ROOT/sim_to_sim/step05_policy_server.py") --model $(printf '%q' "$MODEL_PATH") --host 127.0.0.1 --port $(printf '%q' "$POLICY_PORT")"
+new_window policy "cd $(printf '%q' "$FLIGHTLXX_ROOT") && $(printf '%q' "$POLICY_PYTHON") $(printf '%q' "$FLIGHTLXX_ROOT/sim_to_sim/step05_policy_server.py") --model $(printf '%q' "$MODEL_PATH") --host 127.0.0.1 --port $(printf '%q' "$POLICY_PORT")"
 new_window px4 "cd $(printf '%q' "$PX4_DIR") && make px4_sitl gz_x500"
 
-if [[ -n "${DISPLAY:-}" ]] && command -v gnome-terminal >/dev/null 2>&1; then
-    tmux select-window -t "$SESSION:px4"
-    gnome-terminal --title="FlightLxx sim-to-sim ($SESSION)" -- tmux attach-session -t "$SESSION" >/dev/null 2>&1 &
-    disown || true
-else
-    printf 'No desktop terminal detected. View process windows with: tmux attach -t %s\n' "$SESSION"
+if [[ "$TERMINAL_MODE" == "tmux" ]]; then
+    printf 'Attach manually with: tmux attach -t %s\n' "$SESSION"
 fi
 
 printf 'Waiting for PX4 startup and DDS topic discovery...\n'
 wait_for_px4_prompt 180 || die "PX4 startup failed; inspect tmux window px4"
 wait_for_px4_topics 90 || die "PX4 topics are unavailable; check the Agent and PX4 DDS synchronization"
 
-new_window recorder "source $(printf '%q' "$ROS_SETUP") && source $(printf '%q' "$ROS2_WS_SETUP") && cd $(printf '%q' "$FLIGHTLXX_ROOT") && exec $(printf '%q' "$ROS_PYTHON") $(printf '%q' "$FLIGHTLXX_ROOT/sim_to_sim/step15_record_experiment.py") --with-ulog --px4-dir $(printf '%q' "$PX4_DIR")"
+new_window recorder "source $(printf '%q' "$ROS_SETUP") && source $(printf '%q' "$ROS2_WS_SETUP") && cd $(printf '%q' "$FLIGHTLXX_ROOT") && $(printf '%q' "$ROS_PYTHON") $(printf '%q' "$FLIGHTLXX_ROOT/sim_to_sim/step15_record_experiment.py") --with-ulog --px4-dir $(printf '%q' "$PX4_DIR")"
 
 printf 'Waiting for the policy server...\n'
 policy_ready=0
@@ -393,7 +445,7 @@ YAW_REFERENCE="$(printf '%s\n' "$yaw_output" | sed -n 's/^physical_yaw_reference
 
 CONTROLLER_BASE="source $(printf '%q' "$ROS_SETUP") && source $(printf '%q' "$ROS2_WS_SETUP") && cd $(printf '%q' "$FLIGHTLXX_ROOT") && $(printf '%q' "$ROS_PYTHON") $(printf '%q' "$FLIGHTLXX_ROOT/sim_to_sim/step09_px4_offboard_rates.py") --physical-hover 0 0 $TAKEOFF_ALT_M --nn-goal 0 0 $TAKEOFF_ALT_M --physical-yaw-reference $(printf '%q' "$YAW_REFERENCE")"
 new_window controller "$CONTROLLER_BASE"
-printf '\nDry-run controller started with calibrated yaw %.6f rad. Check its request/action output in tmux window "controller".\n' "$YAW_REFERENCE"
+printf '\nDry-run controller started with calibrated yaw %.6f rad. Check its request/action output in the controller terminal (tmux window "controller").\n' "$YAW_REFERENCE"
 wait_for_text controller 'request[' 60 || die 'dry-run controller did not produce policy output'
 read -r -p 'If dry-run actions are finite and thrust is not unexpectedly saturated, press Enter to start publishing (Ctrl+C aborts and requests landing): ' _
 
