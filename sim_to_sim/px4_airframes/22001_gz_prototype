@@ -1,0 +1,80 @@
+#!/bin/sh
+#
+# @name FlightLxx Prototype (Gazebo Harmonic)
+# @type Quadrotor
+# FlightLxx Prototype SITL integration; mirrored into PX4 by install_prototype_px4.py
+#
+
+. ${R}etc/init.d/rc.mc_defaults
+
+PX4_SIMULATOR=${PX4_SIMULATOR:=gz}
+PX4_GZ_WORLD=${PX4_GZ_WORLD:=default}
+PX4_SIM_MODEL=${PX4_SIM_MODEL:=gz_prototype}
+
+param set-default SIM_GZ_EN 1
+param set-default CA_AIRFRAME 0
+param set-default CA_ROTOR_COUNT 4
+
+# FlightLxx B-allocation rotor positions are FLU; PX4 CA parameters are FRD.
+# Convert y -> -y. Motor index assignment follows SDF motorNumber and B columns.
+param set-default CA_ROTOR0_PX  0.08838835
+param set-default CA_ROTOR0_PY -0.08838835
+param set-default CA_ROTOR0_CT  6.5
+param set-default CA_ROTOR0_KM -0.01
+param set-default CA_ROTOR1_PX  0.08838835
+param set-default CA_ROTOR1_PY  0.08838835
+param set-default CA_ROTOR1_CT  6.5
+param set-default CA_ROTOR1_KM  0.01
+param set-default CA_ROTOR2_PX -0.08838835
+param set-default CA_ROTOR2_PY  0.08838835
+param set-default CA_ROTOR2_CT  6.5
+param set-default CA_ROTOR2_KM -0.01
+param set-default CA_ROTOR3_PX -0.08838835
+param set-default CA_ROTOR3_PY -0.08838835
+param set-default CA_ROTOR3_CT  6.5
+param set-default CA_ROTOR3_KM  0.01
+
+param set-default SIM_GZ_EC_FUNC1 101
+param set-default SIM_GZ_EC_FUNC2 102
+param set-default SIM_GZ_EC_FUNC3 103
+param set-default SIM_GZ_EC_FUNC4 104
+
+# PX4's SIM_GZ_EC output parameters are constrained to [0, 1000]. The
+# Gazebo model scales the Prototype motor curve into this supported range.
+param set-default SIM_GZ_EC_MIN1 38
+param set-default SIM_GZ_EC_MIN2 38
+param set-default SIM_GZ_EC_MIN3 38
+param set-default SIM_GZ_EC_MIN4 38
+param set-default SIM_GZ_EC_MAX1 1000
+param set-default SIM_GZ_EC_MAX2 1000
+param set-default SIM_GZ_EC_MAX3 1000
+param set-default SIM_GZ_EC_MAX4 1000
+
+# Approximate the FlightLxx polynomial with the Gazebo plugin's quadratic law.
+param set-default THR_MDL_FAC 0.0
+param set-default MC_BAT_SCALE_EN 0
+param set-default MPC_THR_HOVER 0.34296
+param set-default MC_ROLLRATE_MAX 360
+param set-default MC_PITCHRATE_MAX 360
+param set-default MC_YAWRATE_MAX 180
+
+# Prototype inertia is about one tenth of the Gazebo x500 inertia. Start with
+# rate-loop gains scaled to that inertia instead of inheriting x500-oriented
+# PX4 defaults; this is a conservative SITL baseline, not a final flight tune.
+param set-default MC_ROLLRATE_P 0.0165
+param set-default MC_ROLLRATE_I 0.020
+param set-default MC_ROLLRATE_D 0.0003
+param set-default MC_PITCHRATE_P 0.0165
+param set-default MC_PITCHRATE_I 0.020
+param set-default MC_PITCHRATE_D 0.0003
+param set-default MC_YAWRATE_P 0.018
+param set-default MC_YAWRATE_I 0.009
+param set-default MC_YAWRATE_D 0.0
+
+# This airframe is used for headless SITL, where no MAVLink GCS heartbeat is
+# present. The sim-to-sim launcher also forces this at runtime in case PX4 has
+# a previously saved value of 2.
+param set-default NAV_DLL_ACT 0
+
+# Keep EKF drag compensation at PX4's normal defaults; FlightLxx does not expose
+# an equivalent body-drag coefficient in prototype.yaml.

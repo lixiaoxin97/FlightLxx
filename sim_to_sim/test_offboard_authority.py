@@ -114,6 +114,7 @@ class ControllerPublicationTests(unittest.TestCase):
         # message objects. This creates no ROS nodes or network traffic.
         self.node = SimpleNamespace(
             authority=OffboardAuthority(), publish_enabled=True,
+            handover_guard_ready=True, handover_completed=False,
             last_authority_status=None, heartbeat_count=0, publish_count=0,
             offboard_publisher=Mock(), rates_publisher=Mock(),
             get_clock=lambda: SimpleNamespace(now=lambda: SimpleNamespace(nanoseconds=10_000_000_000)),
@@ -153,6 +154,16 @@ class ControllerPublicationTests(unittest.TestCase):
         self.assertEqual(self.node.heartbeat_count, 4)
         self.assertEqual(self.node.publish_count, 1)
 
+    def test_offboard_rates_wait_for_handover_guard(self):
+        self.node.handover_guard_ready = False
+        self.update(14, True)
+        rate_ts, heartbeat_ts, output = self.node._publish_control(self.result, 10)
+        self.assertIsNone(rate_ts)
+        self.assertIsNone(heartbeat_ts)
+        self.assertEqual(output, "handover_guard_blocked")
+        self.node.offboard_publisher.publish.assert_not_called()
+        self.node.rates_publisher.publish.assert_not_called()
+
     def test_no_feedback_stale_feedback_and_dry_run_send_nothing(self):
         self.node._publish_control(self.result, 10)
         self.update(14, True)
@@ -174,6 +185,7 @@ class ControllerPublicationTests(unittest.TestCase):
         n.max_odometry_age = n.max_action_age = .2
         n.physical_hover = n.nn_goal = (0., 0., 5.)
         n.physical_yaw_reference = n.nn_yaw_goal = 0.
+        n.attitude_encoding = "principal_zyx"
         n._emit_trace, n._log_error_throttled = Mock(), Mock()
         from unittest.mock import patch
         with patch.object(controller.time, "monotonic", return_value=10.):

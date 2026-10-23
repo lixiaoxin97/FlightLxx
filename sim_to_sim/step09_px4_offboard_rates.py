@@ -20,7 +20,11 @@ import time
 import uuid
 
 from step06_policy_client import PolicyClient
-from step02_state_contract import STATE_CONTRACT_VERSION, wrap_angle_rad
+from step02_state_contract import (
+    ATTITUDE_ENCODINGS,
+    STATE_CONTRACT_VERSION,
+    wrap_angle_rad,
+)
 from offboard_authority import OffboardAuthority, px4_feedback_topic
 from step07_ros2_policy_bridge import message_to_observation
 from step08_px4_rates_contract import (
@@ -31,6 +35,7 @@ from step08_px4_rates_contract import (
     map_collective_acceleration,
     thrust_model_from_args,
 )
+from handover_guard import evaluate_handover_candidate
 
 try:
     import rclpy
@@ -224,6 +229,7 @@ if rclpy is not None:
             nn_goal,
             physical_yaw_reference,
             nn_yaw_goal,
+            attitude_encoding,
             policy_client,
             max_rate,
             print_period,
@@ -241,6 +247,7 @@ if rclpy is not None:
             self.nn_goal = tuple(nn_goal)
             self.physical_yaw_reference = float(physical_yaw_reference)
             self.nn_yaw_goal = float(nn_yaw_goal)
+            self.attitude_encoding = attitude_encoding
             self.control_rate = float(max_rate)
             self.control_period = 1.0 / self.control_rate
             self.print_period = float(print_period)
@@ -268,6 +275,12 @@ if rclpy is not None:
             self.last_stats_heartbeat_count = 0
             self.heartbeat_hz = 0.0
             self.last_authority_status = None
+            self.handover_guard_required_samples = 25
+            self.handover_guard_good_samples = 0
+            self.handover_guard_ready = False
+            self.handover_guard_last_sequence = None
+            self.handover_guard_reasons = ("waiting_for_fresh_action",)
+            self.handover_completed = False
             self.timer_count = 0
             self.last_stats_time = time.monotonic()
             self.last_stats_publish_count = 0
@@ -295,7 +308,7 @@ if rclpy is not None:
                 ),
                 "world_transform": "p=Rz(alpha)*(p_flu-hover)+goal; "
                                    "v=Rz(alpha)*v_flu; R=Rz(alpha)*R_flu",
-                "attitude_encoding": "Eigen eulerAngles(2,1,0); yaw in [0,pi]",
+                "attitude_encoding": self.attitude_encoding,
                 "body_rate_transform": "FRD->FLU only; independent of world yaw",
                 "max_action_age_s": self.max_action_age,
                 "max_odometry_age_s": self.max_odometry_age,
@@ -305,6 +318,7 @@ if rclpy is not None:
                 ),
                 "publish_enabled": self.publish_enabled,
                 "control_authority_contract": "offboard_only_ctbr_v1",
+                "handover_guard_required_samples": self.handover_guard_required_samples,
                 "vehicle_status_topic": self.vehicle_status_topic,
                 "vehicle_control_mode_topic": self.vehicle_control_mode_topic,
                 "max_feedback_age_s": self.authority.max_feedback_age,
@@ -379,13 +393,17 @@ if rclpy is not None:
             )
             self.get_logger().info(
                 "state_contract=%s; world_yaw_rotation=%.6f rad; "
-                "policy attitude uses training Eigen ZYX branch"
-                % (STATE_CONTRACT_VERSION, self.trace_config["world_yaw_rotation_rad"])
+                "policy attitude encoding=%s"
+                % (STATE_CONTRACT_VERSION,
+                   self.trace_config["world_yaw_rotation_rad"],
+                   self.attitude_encoding)
             )
             self.get_logger().info(
                 "CTBR requires armed Offboard body-rate control; feedback: %s and %s; "
-                "native PX4 modes receive heartbeat only"
-                % (self.vehicle_status_topic, self.vehicle_control_mode_topic)
+                "native PX4 modes receive heartbeat only; first CTBR waits for "
+                "%d consecutive safe hover actions"
+                % (self.vehicle_status_topic, self.vehicle_control_mode_topic,
+                   self.handover_guard_required_samples)
             )
             self.get_logger().info(
                 "control timer=%.3f Hz (%.3f ms), publish=%s; "
@@ -434,6 +452,8 @@ if rclpy is not None:
                 self.last_authority_status = authority.status
             if not authority.heartbeat:
                 return None, None, authority.status
+            if not self.handover_completed and not self.handover_guard_ready:
+                return None, None, "handover_guard_blocked"
             timestamp_us = self.get_clock().now().nanoseconds // 1000
             offboard_message = OffboardControlMode()
             fill_offboard_heartbeat(offboard_message, timestamp_us)
@@ -446,7 +466,27 @@ if rclpy is not None:
                                 result.rates_frd, result.thrust_body_frd)
             self.rates_publisher.publish(rates_message)
             self.publish_count += 1
+            self.handover_completed = True
             return timestamp_us, timestamp_us, "published"
+
+        def _update_handover_guard(self, result):
+            """Require consecutive fresh safe hover actions before first CTBR."""
+            if result is None or result.sequence == self.handover_guard_last_sequence:
+                return
+            self.handover_guard_last_sequence = result.sequence
+            safe, reasons = evaluate_handover_candidate(
+                result.observation, result.raw_action, self.nn_goal,
+                self.nn_yaw_goal,
+            )
+            self.handover_guard_reasons = reasons
+            if safe:
+                self.handover_guard_good_samples += 1
+            else:
+                self.handover_guard_good_samples = 0
+            self.handover_guard_ready = (
+                self.handover_guard_good_samples
+                >= self.handover_guard_required_samples
+            )
 
         def _emit_trace(
             self, now, result, status, inference_count,
@@ -499,6 +539,9 @@ if rclpy is not None:
                     "publish_hz": self.publish_hz,
                     "infer_hz": self.infer_hz,
                     "error": error, "trace_errors": self.trace_error_count,
+                    "handover_guard_ready": self.handover_guard_ready,
+                    "handover_guard_good_samples": self.handover_guard_good_samples,
+                    "handover_guard_reasons": list(self.handover_guard_reasons),
                     "latest_odometry_age_ms": (
                         1000.0 * (now - self.latest_odometry_time)
                         if self.latest_odometry is not None else None
@@ -615,6 +658,7 @@ if rclpy is not None:
                     nn_goal=self.nn_goal,
                     physical_yaw_reference=self.physical_yaw_reference,
                     nn_yaw_goal=self.nn_yaw_goal,
+                    attitude_encoding=self.attitude_encoding,
                 )
             except (TypeError, ValueError) as exc:
                 self._emit_trace(
@@ -642,6 +686,10 @@ if rclpy is not None:
             if not result_is_fresh(
                 result, now, self.max_action_age, self.max_odometry_age
             ):
+                if not self.handover_completed:
+                    self.handover_guard_good_samples = 0
+                    self.handover_guard_ready = False
+                    self.handover_guard_reasons = ("stale_action_or_state",)
                 self._emit_trace(
                     now, result, "no_fresh_action", inference_count,
                     submitted=submitted, error=worker_error,
@@ -652,6 +700,8 @@ if rclpy is not None:
                     "no fresh policy action; CTBR and Offboard heartbeat paused"
                 )
                 return
+            if not self.handover_completed:
+                self._update_handover_guard(result)
             output_timestamp_us, heartbeat_timestamp_us, output_status = (
                 self._publish_control(result, now)
             )
@@ -670,6 +720,7 @@ if rclpy is not None:
             self.get_logger().info(
                 "request[%d], raw=%s, rates_frd=%s, thrust_body=%s, "
                 "collective=%.4f m/s^2, rotor_speed=%.1f rad/s, "
+                "handover_guard=%s(%d/%d,%s), "
                 "thrust_sat=(low:%s high:%s), action_age_ms=%.2f, "
                 "state_age_ms=%.2f, inference_ms=%.2f, output=%s"
                 % (
@@ -679,6 +730,10 @@ if rclpy is not None:
                     tuple(round(value, 5) for value in result.thrust_body_frd),
                     result.collective_thrust,
                     result.thrust_mapping.motor_speed_rad_s,
+                    ("READY" if self.handover_guard_ready else "WAIT"),
+                    self.handover_guard_good_samples,
+                    self.handover_guard_required_samples,
+                    ",".join(self.handover_guard_reasons) or "ok",
                     result.thrust_mapping.saturated_low,
                     result.thrust_mapping.saturated_high,
                     1000.0 * (now - result.completed_at),
@@ -717,6 +772,11 @@ def parse_args():
     parser.add_argument(
         "--nn-yaw-goal", type=float, default=0.0,
         help="network heading used in the same fixed world-frame rotation",
+    )
+    parser.add_argument(
+        "--attitude-encoding", choices=ATTITUDE_ENCODINGS,
+        default="principal_zyx",
+        help="policy Euler branch (default: continuous principal ZYX)",
     )
     parser.add_argument(
         "--control-rate", "--max-rate", dest="max_rate", type=positive_float,
@@ -776,6 +836,7 @@ def main():
             nn_goal=args.nn_goal,
             physical_yaw_reference=args.physical_yaw_reference,
             nn_yaw_goal=args.nn_yaw_goal,
+            attitude_encoding=args.attitude_encoding,
             policy_client=policy_client,
             max_rate=args.max_rate,
             print_period=args.print_period,

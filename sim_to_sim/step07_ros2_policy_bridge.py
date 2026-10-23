@@ -6,6 +6,7 @@ import argparse
 import time
 
 from step02_state_contract import vehicle_odometry_to_observation
+from step02_state_contract import ATTITUDE_ENCODINGS
 from step06_policy_client import PolicyClient
 
 
@@ -33,6 +34,7 @@ def message_to_observation(
     nn_goal,
     physical_yaw_reference=0.0,
     nn_yaw_goal=0.0,
+    attitude_encoding="principal_zyx",
 ):
     """Convert one PX4 VehicleOdometry message to policy input."""
 
@@ -45,6 +47,7 @@ def message_to_observation(
         nn_goal=nn_goal,
         physical_yaw_reference=physical_yaw_reference,
         nn_yaw_goal=nn_yaw_goal,
+        attitude_encoding=attitude_encoding,
     )
 
 
@@ -58,6 +61,7 @@ if rclpy is not None:
             nn_goal,
             physical_yaw_reference,
             nn_yaw_goal,
+            attitude_encoding,
             policy_client,
             max_rate,
             print_period,
@@ -70,6 +74,7 @@ if rclpy is not None:
                 physical_yaw_reference
             )
             self.nn_yaw_goal = float(nn_yaw_goal)
+            self.attitude_encoding = attitude_encoding
 
             self.policy_client = policy_client
             self.request_period = 1.0 / float(max_rate)
@@ -144,6 +149,7 @@ if rclpy is not None:
                         self.physical_yaw_reference
                     ),
                     nn_yaw_goal=self.nn_yaw_goal,
+                    attitude_encoding=self.attitude_encoding,
                 )
             except (TypeError, ValueError) as exc:
                 self._log_error_throttled(
@@ -248,6 +254,12 @@ def main():
     )
 
     parser.add_argument(
+        "--attitude-encoding", choices=ATTITUDE_ENCODINGS,
+        default="principal_zyx",
+        help="policy Euler branch (default: continuous principal ZYX)",
+    )
+
+    parser.add_argument(
         "--max-rate",
         type=float,
         default=30.0,
@@ -305,6 +317,7 @@ def main():
         nn_goal=args.nn_goal,
         physical_yaw_reference=args.physical_yaw_reference,
         nn_yaw_goal=args.nn_yaw_goal,
+        attitude_encoding=args.attitude_encoding,
         policy_client=policy_client,
         max_rate=args.max_rate,
         print_period=args.print_period,

@@ -118,7 +118,7 @@ class StateContractTests(unittest.TestCase):
             transformed = rotate_attitude_world_yaw(q, alpha)
             expected = matmul(zyx_matrix(alpha, 0, 0), zyx_matrix(*ypr))
             self.assertMatrixClose(quaternion_matrix(transformed), expected)
-            self.assertMatrixClose(zyx_matrix(*quaternion_to_training_ypr_rad(transformed)), expected)
+            self.assertMatrixClose(zyx_matrix(*quaternion_to_ypr_rad(transformed)), expected)
 
     def test_full_random_states_match_one_world_transform(self):
         rng = random.Random(2311)
@@ -168,13 +168,37 @@ class StateContractTests(unittest.TestCase):
         self.assertVectorClose(rates, (.2*3.1415926, -.4*3.1415926, -.3*3.1415926))
         self.assertLess(thrust[2], 0)
 
-    def test_signed_heading_stays_separate_from_training_euler(self):
+    def test_deployment_euler_is_principal_and_preserves_attitude(self):
         q = quaternion_from_ypr(-.2, .1, -.3)
         self.assertVectorClose(quaternion_to_ypr_rad(q), (-.2, .1, -.3))
+        obs = flu_input((0, 0, 5), (-.2, .1, -.3), (0, 0, 0), (0, 0, 0))
+        self.assertVectorClose(obs[3:6], (-.2, .1, -.3))
+        self.assertMatrixClose(zyx_matrix(*obs[3:6]), quaternion_matrix(q))
         self.assertVectorClose(quaternion_to_training_ypr_rad(q),
                                (math.pi-.2, math.pi-.1, math.pi-.3))
         q_px4 = (q[0], q[1], -q[2], -q[3])
         self.assertAlmostEqual(raw_flu_yaw_from_px4_q(q_px4), -.2)
+
+    def test_deployment_euler_is_continuous_across_zero_yaw(self):
+        epsilon = 1.0e-6
+        negative = flu_input((0, 0, 5), (-epsilon, 0, 0), (0, 0, 0), (0, 0, 0))
+        positive = flu_input((0, 0, 5), (epsilon, 0, 0), (0, 0, 0), (0, 0, 0))
+        self.assertVectorClose(negative[3:6], (-epsilon, 0, 0), tolerance=2e-9)
+        self.assertVectorClose(positive[3:6], (epsilon, 0, 0), tolerance=2e-9)
+        self.assertLess(math.dist(negative[3:6], positive[3:6]), 3e-6)
+
+    def test_physical_yaw_alignment_returns_to_zero_network_yaw(self):
+        raw_yaw = -1.583687388
+        q = quaternion_from_ypr(raw_yaw, 0.01, -0.02)
+        obs = vehicle_odometry_to_observation(
+            (0, 0, -5), (q[0], q[1], -q[2], -q[3]),
+            (0, 0, 0), (0, 0, 0),
+            physical_yaw_reference=raw_yaw,
+            nn_yaw_goal=0.0,
+        )
+        self.assertAlmostEqual(obs[3], 0.0, delta=2e-8)
+        self.assertAlmostEqual(obs[4], 0.01, delta=2e-8)
+        self.assertAlmostEqual(obs[5], -0.02, delta=2e-8)
 
     def test_quaternion_sign_scale_and_wraparound(self):
         for ypr in ((1.2, .4, -.8), (-.2, -.3, 2.8), (3.1, 2.1, -2)):

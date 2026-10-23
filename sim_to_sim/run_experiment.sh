@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Launch and supervise one PX4/Gazebo x500 sim-to-sim experiment.
+# Launch and supervise one PX4/Gazebo sim-to-sim experiment.
 # The dry-run and Offboard handover intentionally require operator confirmation.
 # Each process gets an independently controlled desktop terminal. tmux remains
 # the backend so the launcher can send PX4 commands and supervise shutdown.
@@ -14,9 +14,13 @@ ROS_SETUP="${S2S_ROS_SETUP:-/opt/ros/humble/setup.bash}"
 ROS2_WS_SETUP="${S2S_ROS2_WS_SETUP:-$HOME/px4_ros2_ws/install/setup.bash}"
 ROS_PYTHON="${S2S_ROS_PYTHON:-/usr/bin/python3}"
 POLICY_PYTHON="${S2S_POLICY_PYTHON:-$HOME/anaconda3/envs/flightlxx3.8/bin/python}"
-MODEL_PATH="${S2S_MODEL:-$FLIGHTLXX_ROOT/Simulation_Experiments/models/CTBR+ID.zip}"
+MODEL_PATH="${S2S_MODEL:-$FLIGHTLXX_ROOT/Simulation_Experiments/models/CTBR+DR.zip}"
 POLICY_PORT="${S2S_POLICY_PORT:-5800}"
 TAKEOFF_ALT_M="${S2S_TAKEOFF_ALT_M:-5}"
+NN_YAW_GOAL="${S2S_NN_YAW_GOAL:-0.0}"
+ATTITUDE_ENCODING="${S2S_ATTITUDE_ENCODING:-principal_zyx}"
+VEHICLE_PROFILE="${S2S_VEHICLE_PROFILE:-prototype}"
+PX4_MODEL_TARGET=""
 TERMINAL_MODE="${S2S_TERMINAL_MODE:-windows}"
 SESSION="flightlxx_s2s_$$"
 VIEW_SESSIONS=()
@@ -43,8 +47,15 @@ returns to its shell. After normal cleanup, desktop terminals stay open with
 an interactive shell. Closing a terminal detaches its view; it does not stop
 the experiment. Use the launcher's final Enter prompt or Ctrl+C to land.
 
-The launcher waits for a stable takeoff, runs the policy in dry-run, and asks
-before enabling policy control. Press Enter at the final prompt to land.
+The default vehicle is the local FlightLxx Prototype. The launcher installs
+its Gazebo models and PX4 airframe in the selected PX4 checkout and builds
+gz_prototype. Set S2S_VEHICLE_PROFILE=x500 to use x500 instead.
+
+For headless SITL it disables the GCS-required arming check and waits for PX4
+preflight before takeoff. It then waits for a stable hover, runs the policy in
+dry-run with principal ZYX attitude observations and the trained zero-yaw
+target, then asks before enabling policy control. Press Enter at the final
+prompt to land.
 
 Optional environment overrides:
   S2S_PX4_DIR           PX4-Autopilot path (default: ~/PX4-Autopilot)
@@ -55,6 +66,9 @@ Optional environment overrides:
   S2S_MODEL             PPO model path (default: CTBR+ID.zip)
   S2S_POLICY_PORT       Local UDP policy port (default: 5800)
   S2S_TAKEOFF_ALT_M     PX4 takeoff altitude in meters (default: 5)
+  S2S_NN_YAW_GOAL       policy-frame yaw target in rad (default: 0)
+  S2S_ATTITUDE_ENCODING principal_zyx (default) or eigen_zyx (diagnostic)
+  S2S_VEHICLE_PROFILE   prototype (default) or x500
   S2S_TERMINAL_MODE     windows (default) or tmux (for headless/manual attach)
 EOF
 }
@@ -92,10 +106,27 @@ done
 [[ -f "$MODEL_PATH" ]] || die "policy model not found: $MODEL_PATH"
 [[ -d "$PX4_DIR/build/px4_sitl_default" ]] || die "PX4 SITL build not found under $PX4_DIR"
 [[ -f "$FLIGHTLXX_ROOT/sim_to_sim/step09_px4_offboard_rates.py" ]] || die "sim-to-sim files are missing"
+case "$VEHICLE_PROFILE" in
+    prototype)
+        PX4_MODEL_TARGET="gz_prototype"
+        [[ -f "$FLIGHTLXX_ROOT/sim_to_sim/install_prototype_px4.py" ]] || die "Prototype PX4 installer is missing"
+        ;;
+    x500)
+        PX4_MODEL_TARGET="gz_x500"
+        ;;
+    *) die "S2S_VEHICLE_PROFILE must be prototype or x500" ;;
+esac
 [[ "$POLICY_PORT" =~ ^[0-9]+$ ]] || die "S2S_POLICY_PORT must be an integer"
 (( POLICY_PORT > 0 && POLICY_PORT < 65536 )) || die "S2S_POLICY_PORT must be in 1..65535"
 [[ "$TAKEOFF_ALT_M" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "S2S_TAKEOFF_ALT_M must be a positive number"
 awk -v h="$TAKEOFF_ALT_M" 'BEGIN { exit !(h > 0 && h <= 100) }' || die "S2S_TAKEOFF_ALT_M must be in (0, 100]"
+[[ "$NN_YAW_GOAL" =~ ^-?[0-9]+([.][0-9]+)?$ ]] || die "S2S_NN_YAW_GOAL must be numeric"
+awk -v yaw="$NN_YAW_GOAL" 'BEGIN { exit !(yaw >= -3.141593 && yaw <= 3.141593) }' || \
+    die "S2S_NN_YAW_GOAL must be in [-pi, pi] rad"
+case "$ATTITUDE_ENCODING" in
+    principal_zyx|eigen_zyx) ;;
+    *) die "S2S_ATTITUDE_ENCODING must be principal_zyx or eigen_zyx" ;;
+esac
 
 # ROS setup scripts read optional variables without default values. Temporarily
 # disable nounset while sourcing them, then restore the launcher's strict mode.
@@ -109,6 +140,10 @@ set -u
 for required in ros2 make; do
     command -v "$required" >/dev/null 2>&1 || die "required command not found after sourcing ROS: $required"
 done
+if [[ "$VEHICLE_PROFILE" == "prototype" ]]; then
+    "$ROS_PYTHON" "$FLIGHTLXX_ROOT/sim_to_sim/install_prototype_px4.py" --px4-dir "$PX4_DIR" || \
+        die "could not install the local Prototype model into PX4"
+fi
 if ! pgrep -x MicroXRCEAgent >/dev/null 2>&1; then
     command -v MicroXRCEAgent >/dev/null 2>&1 || die "MicroXRCEAgent not found after sourcing ROS workspace"
 fi
@@ -226,6 +261,27 @@ wait_for_px4_topics() {
     discover_px4_topics
     printf 'Timed out waiting for PX4 topics. Current matches: local=%s status=%s landed=%s\n' \
         "${LOCAL_TOPIC:-none}" "${STATUS_TOPIC:-none}" "${LAND_TOPIC:-none}" >&2
+    return 1
+}
+
+wait_for_preflight() {
+    local timeout_s="${1:-90}"
+    local deadline=$((SECONDS + timeout_s))
+    local output preflight="unknown"
+    printf 'Waiting for PX4 preflight checks to pass (headless SITL; NAV_DLL_ACT=0).\n'
+    while (( SECONDS < deadline )); do
+        output="$(topic_once "$STATUS_TOPIC")"
+        preflight="$(printf '%s\n' "$output" | awk -F': ' '/^pre_flight_checks_pass: / {print $2; exit}')"
+        if [[ "$preflight" == "true" ]]; then
+            printf 'PX4 preflight checks passed.\n'
+            return 0
+        fi
+        sleep 1
+    done
+    printf 'PX4 preflight checks did not pass within %s s (pre_flight_checks_pass=%s).\n' \
+        "$timeout_s" "${preflight:-not received}" >&2
+    printf 'Recent PX4 output:\n' >&2
+    tmux capture-pane -p -t "$SESSION:px4" -S -35 2>/dev/null | tail -n 20 >&2 || true
     return 1
 }
 
@@ -398,7 +454,7 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 printf 'Starting FlightLxx sim-to-sim experiment.\n'
-printf 'PX4: %s\nModel: %s\nTmux session: %s\n' "$PX4_DIR" "$MODEL_PATH" "$SESSION"
+printf 'PX4: %s\nVehicle: %s\nModel: %s\nTmux session: %s\n' "$PX4_DIR" "$VEHICLE_PROFILE" "$MODEL_PATH" "$SESSION"
 printf 'Terminal mode: %s. Use this launcher terminal for confirmations.\n' "$TERMINAL_MODE"
 
 if pgrep -x MicroXRCEAgent >/dev/null 2>&1; then
@@ -410,7 +466,7 @@ else
 fi
 
 new_window policy "cd $(printf '%q' "$FLIGHTLXX_ROOT") && $(printf '%q' "$POLICY_PYTHON") $(printf '%q' "$FLIGHTLXX_ROOT/sim_to_sim/step05_policy_server.py") --model $(printf '%q' "$MODEL_PATH") --host 127.0.0.1 --port $(printf '%q' "$POLICY_PORT")"
-new_window px4 "cd $(printf '%q' "$PX4_DIR") && make px4_sitl gz_x500"
+new_window px4 "cd $(printf '%q' "$PX4_DIR") && make px4_sitl $(printf '%q' "$PX4_MODEL_TARGET")"
 
 if [[ "$TERMINAL_MODE" == "tmux" ]]; then
     printf 'Attach manually with: tmux attach -t %s\n' "$SESSION"
@@ -438,6 +494,13 @@ printf 'Policy server and recorder are ready.\n'
 if ! wait_for_px4_prompt 2; then
     die 'PX4 shell is no longer available'
 fi
+printf 'Configuring headless SITL and waiting for PX4 health checks.\n'
+send_px4 'param set NAV_DLL_ACT 0'
+sleep 1
+send_px4 'param show NAV_DLL_ACT'
+sleep 1
+wait_for_preflight 90 || die 'PX4 preflight checks failed; takeoff was not requested'
+
 printf 'Setting MIS_TAKEOFF_ALT to %s m and requesting PX4 takeoff.\n' "$TAKEOFF_ALT_M"
 send_px4 "param set MIS_TAKEOFF_ALT $TAKEOFF_ALT_M"
 sleep 1
@@ -446,7 +509,7 @@ sleep 1
 tmux capture-pane -p -t "$SESSION:px4" -S -20 | tail -n 8
 send_px4 'commander takeoff'
 TAKEOFF_REQUESTED=1
-wait_for_hover 150 || die 'takeoff did not reach a stable 5 m hover'
+wait_for_hover 150 || die "takeoff did not reach a stable ${TAKEOFF_ALT_M} m hover"
 
 printf 'Calibrating yaw from the live PX4 odometry...\n'
 if ! yaw_output="$("$ROS_PYTHON" "$FLIGHTLXX_ROOT/sim_to_sim/step12_yaw_calibration.py" --samples 10 --timeout 10 2>&1)"; then
@@ -457,9 +520,9 @@ printf '%s\n' "$yaw_output"
 YAW_REFERENCE="$(printf '%s\n' "$yaw_output" | sed -n 's/^physical_yaw_reference_rad: *//p' | tail -n 1)"
 [[ -n "$YAW_REFERENCE" ]] || die 'could not read the calibrated yaw reference'
 
-CONTROLLER_BASE="source $(printf '%q' "$ROS_SETUP") && source $(printf '%q' "$ROS2_WS_SETUP") && cd $(printf '%q' "$FLIGHTLXX_ROOT") && $(printf '%q' "$ROS_PYTHON") $(printf '%q' "$FLIGHTLXX_ROOT/sim_to_sim/step09_px4_offboard_rates.py") --physical-hover 0 0 $TAKEOFF_ALT_M --nn-goal 0 0 $TAKEOFF_ALT_M --physical-yaw-reference $(printf '%q' "$YAW_REFERENCE")"
+CONTROLLER_BASE="source $(printf '%q' "$ROS_SETUP") && source $(printf '%q' "$ROS2_WS_SETUP") && cd $(printf '%q' "$FLIGHTLXX_ROOT") && $(printf '%q' "$ROS_PYTHON") $(printf '%q' "$FLIGHTLXX_ROOT/sim_to_sim/step09_px4_offboard_rates.py") --vehicle-profile $(printf '%q' "$VEHICLE_PROFILE") --physical-hover 0 0 $TAKEOFF_ALT_M --nn-goal 0 0 $TAKEOFF_ALT_M --physical-yaw-reference $(printf '%q' "$YAW_REFERENCE") --nn-yaw-goal $(printf '%q' "$NN_YAW_GOAL") --attitude-encoding $(printf '%q' "$ATTITUDE_ENCODING")"
 new_window controller "$CONTROLLER_BASE"
-printf '\nDry-run controller started with calibrated yaw %.6f rad. Check its request/action output in the controller terminal (tmux window "controller").\n' "$YAW_REFERENCE"
+printf '\nDry-run controller started with calibrated physical yaw %.6f rad and network yaw goal %.3f rad. Check its request/action output in the controller terminal (tmux window "controller").\n' "$YAW_REFERENCE" "$NN_YAW_GOAL"
 wait_for_text controller 'request[' 60 || die 'dry-run controller did not produce policy output'
 read -r -p 'If dry-run actions are finite and thrust is not unexpectedly saturated, press Enter to start publishing (Ctrl+C aborts and requests landing): ' _
 
@@ -470,8 +533,10 @@ tmux send-keys -t "$SESSION:controller" -l "$CONTROLLER_LIVE"
 tmux send-keys -t "$SESSION:controller" Enter
 wait_for_text controller 'heartbeat_only' 60 || die 'controller did not confirm heartbeat-only readiness; check PX4 mode feedback'
 sleep 2
-printf 'Controller heartbeat is active; neural CTBR is withheld until PX4 confirms armed Offboard body-rate mode.\n'
-read -r -p 'When the x500 is still stable and controller output looks healthy, press Enter to request Offboard: ' _
+wait_for_text controller 'handover_guard=READY' 30 || \
+    die 'policy hover handover guard did not pass; refusing Offboard request'
+printf 'Controller heartbeat and initial hover-action guard are ready; neural CTBR remains withheld until PX4 confirms armed Offboard body-rate mode.\n'
+read -r -p 'When the vehicle is still stable and controller output looks healthy, press Enter to request Offboard: ' _
 
 printf 'Requesting Offboard mode...\n'
 "$ROS_PYTHON" "$FLIGHTLXX_ROOT/sim_to_sim/step10_px4_offboard_command.py" --send --repeat 5 --period 0.1

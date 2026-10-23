@@ -4,7 +4,8 @@ import argparse
 import math
 
 
-STATE_CONTRACT_VERSION = "world_yaw_rotation_eigen_zyx_v2"
+STATE_CONTRACT_VERSION = "world_yaw_rotation_principal_zyx_v3"
+ATTITUDE_ENCODINGS = ("principal_zyx", "eigen_zyx")
 
 
 def _vector(values, size, name):
@@ -68,10 +69,9 @@ def px4_quaternion_to_flu(quaternion_wxyz):
 
 
 def quaternion_to_ypr_rad(quaternion_wxyz):
-    """Return signed yaw/roll and principal pitch, for heading calibration.
+    """Return canonical ZYX with signed yaw/roll and principal pitch.
 
-    Policy observations use quaternion_to_training_ypr_rad instead: the
-    training environment's Eigen Euler-angle branch is different.
+    This is continuous for small rotations around level, zero-yaw hover.
     """
 
     w, x, y, z = _normalize_quaternion_wxyz(quaternion_wxyz)
@@ -141,6 +141,7 @@ def vehicle_odometry_to_observation(
     nn_goal=(0.0, 0.0, 5.0),
     physical_yaw_reference=0.0,
     nn_yaw_goal=0.0,
+    attitude_encoding="principal_zyx",
 ):
     """Build a consistent policy world frame from PX4 NED/FRD odometry.
 
@@ -151,7 +152,8 @@ def vehicle_odometry_to_observation(
     physical_hover is in the original world FLU axes; nn_goal is in network
     world axes. Body rates only change FRD -> FLU, never with world yaw.
     The reference is fixed for a run, so no rotating-frame velocity term is
-    needed. Attitude is encoded using the training environment's Eigen ZYX.
+    needed. The default Euler encoding is canonical ZYX and stays continuous
+    around level, zero-yaw hover. eigen_zyx remains available for diagnostics.
     """
 
     position_flu = px4_ned_to_flu(position_ned)
@@ -203,9 +205,11 @@ def vehicle_odometry_to_observation(
     quaternion_for_network = rotate_attitude_world_yaw(
         quaternion_flu, world_yaw_rotation
     )
-    yaw_for_network, pitch, roll = quaternion_to_training_ypr_rad(
-        quaternion_for_network
-    )
+    if attitude_encoding not in ATTITUDE_ENCODINGS:
+        raise ValueError("unknown attitude encoding: %s" % attitude_encoding)
+    converter = (quaternion_to_ypr_rad if attitude_encoding == "principal_zyx"
+                 else quaternion_to_training_ypr_rad)
+    yaw_for_network, pitch, roll = converter(quaternion_for_network)
 
     return (
         position_for_network[0],

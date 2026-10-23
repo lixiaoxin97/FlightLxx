@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Convert FlightLxx CTBR actions to PX4 body-rate/thrust setpoints.
 
-The default thrust model is PX4's Gazebo Harmonic x500.  Its PX4
-``VehicleRatesSetpoint.thrust_body`` value is a normalized collective demand,
-not an acceleration.  This module converts FlightLxx's mass-normalized
-collective thrust to an x500 motor speed and then inverts PX4's motor thrust
-curve to obtain that normalized demand.
+The default vehicle profile is FlightLxx's Gazebo Prototype. PX4's
+``VehicleRatesSetpoint.thrust_body`` is a normalized collective demand, not an
+acceleration. This module converts FlightLxx's mass-normalized collective
+thrust through the selected vehicle's motor model to that normalized demand.
 """
 
 import argparse
@@ -19,7 +18,7 @@ from step01_action_contract import raw_action_to_ctbr
 # Values from PX4-Autopilot's 4001_gz_x500 airframe, x500 SDF and ULog.
 # motor_omega_min/max are the effective SIM_GZ_EC output limits in rad/s;
 # they must also be compatible with the SDF maxRotVelocity.
-DEFAULT_THRUST_MODEL = {
+X500_THRUST_MODEL = {
     "vehicle_mass_kg": 2.0643076923076915,
     "motor_count": 4,
     "motor_thrust_coefficient": 8.54858e-6,
@@ -27,6 +26,28 @@ DEFAULT_THRUST_MODEL = {
     "motor_omega_max": 1000.0,
     "thrust_model_factor": 0.0,
 }
+
+# PX4's SIM_GZ_EC output parameters are limited to [0, 1000]. Scale the
+# Prototype's RPM range into that range and choose the quadratic coefficient
+# that minimizes the worst relative thrust error against prototype.yaml over
+# the normalized [idle, maximum] motor-command interval.
+PROTOTYPE_THRUST_MODEL = {
+    "vehicle_mass_kg": 0.78,
+    "motor_count": 4,
+    # Gazebo's T=k_f*omega^2 approximation; max relative fit error is ~1.1%.
+    "motor_thrust_coefficient": 1.4131562456735816e-5,
+    # PX4 constrains SIM_GZ_EC_MIN/MAX to [0, 1000]. These are the
+    # corresponding command-speed limits used by the Gazebo motor model.
+    "motor_omega_min": 38.0,
+    "motor_omega_max": 1000.0,
+    "thrust_model_factor": 0.0,
+}
+VEHICLE_THRUST_MODELS = {
+    "prototype": PROTOTYPE_THRUST_MODEL,
+    "x500": X500_THRUST_MODEL,
+}
+DEFAULT_VEHICLE_PROFILE = "prototype"
+DEFAULT_THRUST_MODEL = VEHICLE_THRUST_MODELS[DEFAULT_VEHICLE_PROFILE]
 
 
 @dataclass(frozen=True)
@@ -186,48 +207,48 @@ def unit_interval_float(value):
 
 
 def add_thrust_model_arguments(parser):
-    """Add the x500-default model parameters, all overrideable from CLI."""
+    """Add a named default profile with optional parameter overrides."""
     parser.add_argument(
-        "--vehicle-mass-kg", type=positive_float,
-        default=DEFAULT_THRUST_MODEL["vehicle_mass_kg"],
-        help="all-up SDF vehicle mass, including rotor links (default: x500)",
+        "--vehicle-profile", choices=tuple(VEHICLE_THRUST_MODELS),
+        default=DEFAULT_VEHICLE_PROFILE,
+        help="PX4/Gazebo vehicle profile (default: %s)" % DEFAULT_VEHICLE_PROFILE,
     )
     parser.add_argument(
-        "--motor-count", type=int,
-        default=DEFAULT_THRUST_MODEL["motor_count"],
-        help="number of equal rotors (default: 4)",
+        "--vehicle-mass-kg", type=positive_float,
+        default=None, help="all-up SDF mass; overrides the selected profile",
+    )
+    parser.add_argument(
+        "--motor-count", type=int, default=None,
+        help="number of equal rotors; overrides the selected profile",
     )
     parser.add_argument(
         "--motor-thrust-coefficient", type=positive_float,
-        default=DEFAULT_THRUST_MODEL["motor_thrust_coefficient"],
-        help="Gazebo motorConstant k_f in N/(rad/s)^2 (default: x500)",
+        default=None, help="Gazebo motorConstant k_f in N/(rad/s)^2",
     )
     parser.add_argument(
         "--motor-omega-min", type=nonnegative_float,
-        default=DEFAULT_THRUST_MODEL["motor_omega_min"],
-        help="effective armed SIM_GZ_EC_MIN in rad/s (default: x500 150)",
+        default=None, help="effective armed SIM_GZ_EC_MIN in rad/s",
     )
     parser.add_argument(
         "--motor-omega-max", type=positive_float,
-        default=DEFAULT_THRUST_MODEL["motor_omega_max"],
+        default=None,
         help="SIM_GZ_EC_MAX in rad/s; must not exceed SDF maxRotVelocity",
     )
     parser.add_argument(
         "--thrust-model-factor", type=unit_interval_float,
-        default=DEFAULT_THRUST_MODEL["thrust_model_factor"],
-        help="PX4 THR_MDL_FAC in [0, 1] (default: x500 0)",
+        default=None, help="PX4 THR_MDL_FAC in [0, 1]",
     )
 
 
 def thrust_model_from_args(args):
-    model = {
-        "vehicle_mass_kg": args.vehicle_mass_kg,
-        "motor_count": args.motor_count,
-        "motor_thrust_coefficient": args.motor_thrust_coefficient,
-        "motor_omega_min": args.motor_omega_min,
-        "motor_omega_max": args.motor_omega_max,
-        "thrust_model_factor": args.thrust_model_factor,
-    }
+    profile = getattr(args, "vehicle_profile", DEFAULT_VEHICLE_PROFILE)
+    if profile not in VEHICLE_THRUST_MODELS:
+        raise ValueError("unknown vehicle profile: %s" % profile)
+    model = dict(VEHICLE_THRUST_MODELS[profile])
+    for name in model:
+        override = getattr(args, name, None)
+        if override is not None:
+            model[name] = override
     # Validate cross-field constraints once before starting control.
     map_collective_acceleration(0.0, **model)
     return model
@@ -242,13 +263,56 @@ def _assert_close(actual, expected, tolerance=1.0e-6):
 
 
 def run_self_test():
-    # X500 model should map a 1 g body-thrust request near the hover estimate.
+    # The default Prototype profile should map a 1 g request near hover.
     rates, thrust, collective, mapping = convert_raw_action_to_px4((0, 0, 0, 0))
     _assert_close(rates, (0.0, 0.0, 0.0))
-    _assert_close(thrust, (0.0, 0.0, -0.7288988027), tolerance=1.0e-6)
+    _assert_close(thrust, (0.0, 0.0, -0.3429551081), tolerance=1.0e-6)
     assert abs(collective - 9.81) < 1.0e-6
-    assert abs(mapping.motor_speed_rad_s - 769.5639823) < 1.0e-5
+    assert abs(mapping.motor_speed_rad_s - 367.9228140) < 1.0e-6
     assert not mapping.saturated_high and not mapping.saturated_low
+
+    # Keep an explicit regression for the selectable X500 profile.
+    x500 = VEHICLE_THRUST_MODELS["x500"]
+    _rates, x500_thrust, x500_collective, x500_mapping = convert_raw_action_to_px4(
+        (0, 0, 0, 0), **x500
+    )
+    _assert_close(x500_thrust, (0.0, 0.0, -0.7288988027), tolerance=1.0e-6)
+    assert abs(x500_collective - 9.81) < 1.0e-6
+    assert abs(x500_mapping.motor_speed_rad_s - 769.5639823) < 1.0e-5
+
+    class NoProfileArgs:
+        vehicle_mass_kg = motor_count = motor_thrust_coefficient = None
+        motor_omega_min = motor_omega_max = thrust_model_factor = None
+
+    assert thrust_model_from_args(NoProfileArgs()) == PROTOTYPE_THRUST_MODEL
+
+    # Prototype model's upper policy endpoint is within motor authority.
+    _rates, proto_max_thrust, _collective, proto_max = convert_raw_action_to_px4(
+        (0, 0, 0, 1)
+    )
+    _assert_close(proto_max_thrust, (0.0, 0.0, -0.5013736315), tolerance=1.0e-6)
+    assert not proto_max.saturated_high
+
+    # The X500 model cannot produce the policy's 2 g upper endpoint.
+    _rates, x500_max_thrust, _collective, x500_max = convert_raw_action_to_px4(
+        (0, 0, 0, 1), **x500
+    )
+    _assert_close(x500_max_thrust, (0.0, 0.0, -1.0))
+    assert x500_max.saturated_high
+    assert abs(x500_max.maximum_acceleration_m_s2 - 16.5645461321) < 1.0e-8
+
+    # Prototype model should map hover-level thrust using its configured fit.
+    class PrototypeArgs:
+        vehicle_profile = "prototype"
+        vehicle_mass_kg = motor_count = motor_thrust_coefficient = None
+        motor_omega_min = motor_omega_max = thrust_model_factor = None
+
+    prototype = thrust_model_from_args(PrototypeArgs())
+    proto_hover = map_collective_acceleration(9.81, **prototype)
+    assert prototype["vehicle_mass_kg"] == 0.78
+    assert prototype["motor_omega_min"] == 38.0
+    assert prototype["motor_omega_max"] == 1000.0
+    assert abs(proto_hover.px4_thrust_fraction - 0.3429551081) < 1e-8
 
     # Verify the configured nonlinear PX4 curve and exact zero-minimum case.
     custom = {
@@ -269,42 +333,34 @@ def run_self_test():
     assert abs(linear_curve.px4_thrust_fraction - 0.5) < 1.0e-12
 
     # Reconstruct acceleration through PX4's forward output curve and the
-    # Gazebo quadratic motor model over several curve factors and limits.
-    for omega_min in (0.0, 150.0):
-        for factor in (0.0, 0.3, 1.0):
-            model = dict(DEFAULT_THRUST_MODEL,
-                         motor_omega_min=omega_min,
-                         thrust_model_factor=factor)
-            for acceleration in (1.0, 4.905, 9.81, 16.0, 19.62):
-                mapped = map_collective_acceleration(acceleration, **model)
-                demand = mapped.px4_thrust_fraction
-                if factor == 0.0:
-                    motor_output = demand
-                else:
-                    motor_output = (
-                        math.sqrt((1.0 - factor)**2 + 4.0 * factor * demand)
-                        - (1.0 - factor)
-                    ) / (2.0 * factor)
-                speed = omega_min + motor_output * (
-                    model["motor_omega_max"] - omega_min
-                )
-                reconstructed = (
-                    model["motor_count"] * model["motor_thrust_coefficient"]
-                    * speed**2 / model["vehicle_mass_kg"]
-                )
-                expected = min(acceleration, mapped.maximum_acceleration_m_s2)
-                assert math.isclose(reconstructed, expected, rel_tol=1.0e-12)
-
-    # The x500 policy's 2 g endpoint exceeds its modelled thrust authority.
-    _rates, max_thrust, _collective, saturated = convert_raw_action_to_px4(
-        (0, 0, 0, 1)
-    )
-    _assert_close(max_thrust, (0.0, 0.0, -1.0))
-    assert saturated.saturated_high
-    assert abs(saturated.maximum_acceleration_m_s2 - 16.5645461321) < 1.0e-8
+    # Gazebo quadratic motor model for both supported vehicle profiles.
+    for profile in VEHICLE_THRUST_MODELS.values():
+        for omega_min in (0.0, profile["motor_omega_min"]):
+            for factor in (0.0, 0.3, 1.0):
+                model = dict(profile, motor_omega_min=omega_min,
+                             thrust_model_factor=factor)
+                for acceleration in (1.0, 4.905, 9.81, 16.0, 19.62):
+                    mapped = map_collective_acceleration(acceleration, **model)
+                    demand = mapped.px4_thrust_fraction
+                    if factor == 0.0:
+                        motor_output = demand
+                    else:
+                        motor_output = (
+                            math.sqrt((1.0 - factor)**2 + 4.0 * factor * demand)
+                            - (1.0 - factor)
+                        ) / (2.0 * factor)
+                    speed = omega_min + motor_output * (
+                        model["motor_omega_max"] - omega_min
+                    )
+                    reconstructed = (
+                        model["motor_count"] * model["motor_thrust_coefficient"]
+                        * speed**2 / model["vehicle_mass_kg"]
+                    )
+                    expected = min(acceleration, mapped.maximum_acceleration_m_s2)
+                    assert math.isclose(reconstructed, expected, rel_tol=1.0e-12)
 
     # X500's 150 rad/s armed minimum cannot reproduce FlightLxx zero thrust.
-    idle = map_collective_acceleration(0.0)
+    idle = map_collective_acceleration(0.0, **x500)
     assert idle.px4_thrust_fraction == 0.0
     assert idle.saturated_low
     zero_min = map_collective_acceleration(0.0, motor_omega_min=0.0)
@@ -337,7 +393,7 @@ def run_self_test():
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Convert FlightLxx raw action to PX4 setpoint fields"
+        description="Convert FlightLxx raw action using x500 or Prototype model"
     )
     parser.add_argument(
         "action", nargs=4, type=float,
@@ -356,7 +412,8 @@ def main():
     print("PX4 rates FRD [rad/s]:", tuple(round(value, 6) for value in rates))
     print("PX4 thrust_body FRD:", tuple(round(value, 6) for value in thrust))
     print("FlightLxx collective [m/s^2]:", round(collective, 6))
-    print("X500 model max [m/s^2]:", round(mapping.maximum_acceleration_m_s2, 6))
+    print("%s model max [m/s^2]:" % args.vehicle_profile,
+          round(mapping.maximum_acceleration_m_s2, 6))
     print("commanded rotor speed [rad/s]:", round(mapping.motor_speed_rad_s, 3))
     if mapping.saturated_high:
         print("WARNING: requested collective exceeds model maximum; thrust is saturated")
