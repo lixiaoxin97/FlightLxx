@@ -1,0 +1,26 @@
+{
+  "CTBR": {
+    "checkpoint_sha256": "cda09b4b2d98766cc010e04597b93eb780445e357f4338c421b4e535ab37ca59",
+    "samples": 4096,
+    "single_path_samples": 256,
+    "max_absolute_output_error": 5.327165126800537e-07,
+    "batched_tf_vs_numpy_error": 0.003624260425567627,
+    "mean_numpy_inference_ms": 0.007110737500624964
+  },
+  "CTBR+DR": {
+    "checkpoint_sha256": "5b23c9cf8c6b0f159fa5d120c7ce14b973174bb18f0bc238f8bed19cd2bfa33e",
+    "samples": 4096,
+    "single_path_samples": 256,
+    "max_absolute_output_error": 6.854534149169922e-07,
+    "batched_tf_vs_numpy_error": 0.0031120479106903076,
+    "mean_numpy_inference_ms": 0.007044566500553628
+  },
+  "CTBR+ID": {
+    "checkpoint_sha256": "76fd6f8e8a6c8991fbb305beaa512cb0e114c24d9cd7085186787d0a12bf151d",
+    "samples": 4096,
+    "single_path_samples": 256,
+    "max_absolute_output_error": 6.556510925292969e-07,
+    "batched_tf_vs_numpy_error": 0.003985442221164703,
+    "mean_numpy_inference_ms": 0.007059095001750393
+  }
+}

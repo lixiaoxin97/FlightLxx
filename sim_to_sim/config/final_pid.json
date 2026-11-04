@@ -1,0 +1,15 @@
+{
+  "profiles": {
+    "continue_736ee51a5cf0": {
+      "MC_ROLLRATE_P": "0.097",
+      "MC_ROLLRATE_I": "0.004",
+      "MC_ROLLRATE_D": "0.00135",
+      "MC_PITCHRATE_P": "0.0869",
+      "MC_PITCHRATE_I": "0.004",
+      "MC_PITCHRATE_D": "0.00135",
+      "MC_YAWRATE_P": "0.126",
+      "MC_YAWRATE_I": "0.0018",
+      "MC_YAWRATE_D": "0.006"
+    }
+  }
+}

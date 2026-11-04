@@ -1,0 +1,21 @@
+{
+  "report_pdf": "/home/lixiaoxin97/Desktop/FlightLxx/sim_to_sim/FINAL_PID_TWO_EXPERIMENTS_REPORT_2026-11-01.pdf",
+  "report_pdf_sha256": "050a964859769aef73ffbb2c66a0d3c9fa5ee434513edba87c52b4dd0e6cf6f4",
+  "report_markdown": "/home/lixiaoxin97/Desktop/FlightLxx/sim_to_sim/FINAL_PID_TWO_EXPERIMENTS_REPORT_2026-11-01.md",
+  "report_markdown_sha256": "5ff4202520503b06fe012ba63195304d6630bb9d6d17f30f03d46aa3b8c0847a",
+  "raw_completed_records_unchanged": true,
+  "raw_completed_record_count": 6000,
+  "original_reports_unchanged": true,
+  "figure_paths": {
+    "control_flow": "/home/lixiaoxin97/Desktop/FlightLxx/sim_to_sim/reports/final_pid_comparison_20261101/control_flow.png",
+    "success_overview": "/home/lixiaoxin97/Desktop/FlightLxx/sim_to_sim/reports/final_pid_comparison_20261101/success_overview.png",
+    "initial_distributions": "/home/lixiaoxin97/Desktop/FlightLxx/sim_to_sim/reports/final_pid_comparison_20261101/initial_distributions.png",
+    "tilt_success": "/home/lixiaoxin97/Desktop/FlightLxx/sim_to_sim/reports/final_pid_comparison_20261101/tilt_success.png",
+    "failure_composition": "/home/lixiaoxin97/Desktop/FlightLxx/sim_to_sim/reports/final_pid_comparison_20261101/failure_composition.png",
+    "matched_quality": "/home/lixiaoxin97/Desktop/FlightLxx/sim_to_sim/reports/final_pid_comparison_20261101/matched_quality.png",
+    "stabilization_subdistribution": "/home/lixiaoxin97/Desktop/FlightLxx/sim_to_sim/reports/final_pid_comparison_20261101/stabilization_subdistribution.png",
+    "trajectory_A": "/home/lixiaoxin97/Desktop/FlightLxx/sim_to_sim/reports/final_pid_comparison_20261101/trajectory_A.png",
+    "trajectory_B": "/home/lixiaoxin97/Desktop/FlightLxx/sim_to_sim/reports/final_pid_comparison_20261101/trajectory_B.png"
+  },
+  "data_directory": "/home/lixiaoxin97/Desktop/FlightLxx/sim_to_sim/reports/final_pid_comparison_20261101"
+}
