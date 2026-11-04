@@ -7,9 +7,9 @@ Train the three policies for Paper1 — Ideal Dynamics.
   CTBR+ID: ideal dynamics (skip motor model, direct kinematics)
 
 Usage:
-    python3 Simulation_Experiments/train.py --model CTBR
-    python3 Simulation_Experiments/train.py --model CTBR+DR
-    python3 Simulation_Experiments/train.py --model CTBR+ID
+    python3 train/train.py --model CTBR
+    python3 train/train.py --model CTBR+DR
+    python3 train/train.py --model CTBR+ID
 """
 import os, sys, argparse
 import numpy as np

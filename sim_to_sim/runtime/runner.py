@@ -53,14 +53,14 @@ def hashes(files):
 def frozen_files(px4, bank_path, seed):
     files = list(HERE.glob("*.py")) + [HERE/"launch_trial.sh", ROOT/"experiment.py",
         ROOT/"config/final_pid.json", ROOT/"config/policy_equivalence.json", Path(bank_path).resolve(),
-        ROOT.parent/"Simulation_Experiments/recovery_metrics.py", ROOT.parent/"libs/config/prototype.yaml",
+        ROOT.parent/"train/recovery_metrics.py", ROOT.parent/"libs/config/prototype.yaml",
         px4/"build/px4_sitl_default/bin/px4", ROOT/"build/state_injector/libflightlxx_state_injector.so",
         ROOT/"build/state_injector/flightlxx_state_injector_cli",
         px4/"src/modules/ekf2/EKF/aid_sources/external_vision/ev_vel_control.cpp",
         px4/"Tools/simulation/gz/worlds/default.sdf", px4/"ROMFS/px4fmu_common/init.d/rc.mc_defaults"]
     files += list((ROOT/"gazebo").rglob("*.sdf")) + list((ROOT/"gazebo/plugins").glob("*.cpp"))
     files += list((ROOT/"px4_airframes").glob("*_gz_*"))
-    files += [ROOT.parent/"Simulation_Experiments/models"/(m+".zip") for m in MODELS]
+    files += [ROOT.parent/"train/models"/(m+".zip") for m in MODELS]
     files += list(seed.glob("parameters*.bson"))
     missing = [str(p) for p in files if not p.is_file()]
     if missing:
@@ -137,7 +137,7 @@ def run_batch(bank_path, output, *, workers=12, models=MODELS, max_trials=None,
         raise ValueError("Cannot resume a directory without its experiment manifest")
     check = json.loads((ROOT/"config/policy_equivalence.json").read_text())
     for model in models:
-        path = ROOT.parent/"Simulation_Experiments/models"/(model+".zip")
+        path = ROOT.parent/"train/models"/(model+".zip")
         if digest(path) != check[model]["checkpoint_sha256"] or check[model]["max_absolute_output_error"] >= 1e-5:
             raise RuntimeError("Checkpoint no longer matches validated NumPy inference: " + model)
     output.mkdir(parents=True, exist_ok=True)

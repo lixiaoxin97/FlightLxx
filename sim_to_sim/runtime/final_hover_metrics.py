@@ -8,7 +8,7 @@ import math
 from pathlib import Path
 import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]))
-from Simulation_Experiments.recovery_metrics import evaluate_trajectory, weighted_mean, vector_jitter
+from train.recovery_metrics import evaluate_trajectory, weighted_mean, vector_jitter
 
 VERSION = 'terminal_hover_10s_tail2_v1'
 PROTOCOL = dict(version=VERSION, duration_s=10., tail_s=2., position_m=.3,

@@ -7,7 +7,7 @@ Tests 3 policies (CTBR / CTBR+DR / CTBR+ID) on 3 platforms
 to a random aggressive initial state and measures recovery performance.
 
 Usage:
-    python3 Simulation_Experiments/run_experiment.py --trials 100 --seed 42
+    python3 train/run_experiment.py --trials 100 --seed 42
 """
 import os
 import sys
@@ -24,9 +24,9 @@ from rl.lxx_baselines.ppo.ppo2 import PPO2
 from rl.lxx_baselines.envs import vec_env_wrapper as wrapper
 from flightgym import QuadrotorEnv_v1
 
-from Simulation_Experiments.configs import get_platform_config, get_model_weight
-from Simulation_Experiments.disturbances import random_initial_state
-from Simulation_Experiments.metrics import TrialResult, ExperimentResults, compute_metrics
+from train.configs import get_platform_config, get_model_weight
+from train.disturbances import random_initial_state
+from train.metrics import TrialResult, ExperimentResults, compute_metrics
 
 
 # ---------------------------------------------------------------------------

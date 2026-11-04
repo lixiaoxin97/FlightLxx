@@ -19,7 +19,7 @@ import uuid
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from Simulation_Experiments.recovery_metrics import RecoveryTracker, METRICS_VERSION
+from train.recovery_metrics import RecoveryTracker, METRICS_VERSION
 
 from gz.transport13 import Node as GzNode
 from gz.msgs10.stringmsg_pb2 import StringMsg

@@ -34,9 +34,9 @@ PLATFORM_PARAMS = {
 }
 
 MODEL_WEIGHTS = {
-    "CTBR":    os.path.join(FLIGHTLXX_PATH, "Simulation_Experiments", "models", "CTBR.zip"),
-    "CTBR+DR": os.path.join(FLIGHTLXX_PATH, "Simulation_Experiments", "models", "CTBR+DR.zip"),
-    "CTBR+ID": os.path.join(FLIGHTLXX_PATH, "Simulation_Experiments", "models", "CTBR+ID.zip"),
+    "CTBR":    os.path.join(FLIGHTLXX_PATH, "train", "models", "CTBR.zip"),
+    "CTBR+DR": os.path.join(FLIGHTLXX_PATH, "train", "models", "CTBR+DR.zip"),
+    "CTBR+ID": os.path.join(FLIGHTLXX_PATH, "train", "models", "CTBR+ID.zip"),
 }
 
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Unstratified independent component-uniform random states, with no rejection.
 
-Matches the distributions in Simulation_Experiments/disturbances/__init__.py:
+Matches the distributions in train/disturbances/__init__.py:
 position errors +/-1m, Euler roll/pitch +/-pi, yaw 0..2pi, velocities and body
 rates +/-1. This explicitly is NOT a Haar-uniform distribution over SO(3).
 """

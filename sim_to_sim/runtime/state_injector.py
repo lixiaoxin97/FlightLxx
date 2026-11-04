@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Inject and verify a FlightLxx 12D state in the Gazebo Prototype model.
 
-The input vector follows Simulation_Experiments.random_initial_state():
+The input vector follows train.disturbances.random_initial_state():
 [x, y, z, roll, pitch, yaw, vx, vy, vz, wx, wy, wz]. Position, linear
 velocity, and angular velocity use the policy's FlightLxx NWU/FLU frames.
 This utility only talks to Gazebo for state changes; it never arms or changes

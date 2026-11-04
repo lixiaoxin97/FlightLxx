@@ -21,7 +21,9 @@ PYTHONNOUSERSITE=1 /usr/bin/python3 -u sim_to_sim/experiment.py run \
   --output sim_to_sim/logs/random_20261105 --workers 12
 ```
 
-全随机范围：位置相对于目标 `(0,0,5 m)` 各轴 `[-1,1] m`，roll/pitch 各 `[-π,π]`、yaw `[0,2π)`，世界线速度各轴 `[-1,1] m/s`、机体角速度各轴 `[-1,1] rad/s`。欧拉角分别均匀，沿用 Simulation_Experiments 的定义。无分档、筛选或失败重采样。
+全随机范围：位置相对于目标 `(0,0,5 m)` 各轴 `[-1,1] m`，roll/pitch 各 `[-π,π]`、yaw `[0,2π)`，世界线速度各轴 `[-1,1] m/s`、机体角速度各轴 `[-1,1] rad/s`。欧拉角分别均匀，沿用 train 的定义。无分档、筛选或失败重采样。
+
+训练及权重目录现为 `train/`，运行时从 `train/models/` 读取三个网络。保留初态中的来源说明及历史记录中的旧目录名记录的是当时的来源，不参与当前路径解析。
 
 也可直接编辑生成文件中的 `states`。每项使用唯一 `id` 与12维 `state`：
 

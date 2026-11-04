@@ -1,15 +1,17 @@
-# Simulation Experiments — FlightLxx
+# Training and Simulation Experiments — FlightLxx
 
 Paper: *Ideal Dynamics for Sim-to-Real Quadrotor Control*
 
 ## Directory Structure
 
 ```
-Simulation_Experiments/
+train/
+├── __init__.py           # Python package entry
 ├── train.py              # Training script
 ├── run_experiment.py     # Experiment runner
 ├── configs.py            # Platform & model configuration
 ├── metrics.py            # Recovery metrics
+├── recovery_metrics.py   # Shared recovery evaluation with sim_to_sim
 ├── plot_results.py       # Visualization
 ├── disturbances/         # Random initial state generator
 ├── models/               # Trained model weights (3 .zip files)
@@ -30,12 +32,16 @@ Three strategies are trained on the **Prototype** platform (0.78 kg, custom-buil
 
 ```bash
 conda activate flightlxx3.8
-python3 Simulation_Experiments/train.py --model CTBR     # ~50 hours on RTX 3090
-python3 Simulation_Experiments/train.py --model CTBR+DR
-python3 Simulation_Experiments/train.py --model CTBR+ID
+python3 train/train.py --model CTBR     # ~50 hours on RTX 3090
+python3 train/train.py --model CTBR+DR
+python3 train/train.py --model CTBR+ID
 ```
 
 Models are saved to `models/` and training logs to `training_data/`.
+
+`train` is also a Python package. From the FlightLxx root, the equivalent module commands are
+`python3 -m train.train --model CTBR` and
+`python3 -m train.run_experiment --trials 100 --seed 42`.
 
 ### Training Configuration
 
@@ -55,10 +61,10 @@ Tests recovery from random initial states on 3 platforms.
 
 ```bash
 # 900 trials (3 platforms × 3 models × 100 repeats)
-python3 Simulation_Experiments/run_experiment.py --trials 100 --seed 42
+python3 train/run_experiment.py --trials 100 --seed 42
 
 # Visualize
-python3 Simulation_Experiments/plot_results.py results.csv
+python3 train/plot_results.py results.csv
 ```
 
 ### Design

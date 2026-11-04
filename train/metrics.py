@@ -6,7 +6,7 @@ Recovery criterion: pos_error < 0.3 m AND speed < 0.3 m/s, sustained for 0.3 s.
 import numpy as np
 from dataclasses import dataclass, field
 from typing import List
-from Simulation_Experiments.recovery_metrics import evaluate_trajectory
+from train.recovery_metrics import evaluate_trajectory
 
 
 @dataclass

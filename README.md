@@ -4,6 +4,14 @@ Quadrotor simulator with deep reinforcement learning.
 Originally from rpg/flightmare, with modifications for sim-to-real control research.  
 MIT License.
 
+## Project Structure
+
+- `libs/`: C++ quadrotor dynamics, simulation environments and Python bindings.
+- `rl/`: PPO implementation, policies and vectorized environment wrappers.
+- `train/`: CTBR / CTBR+DR / CTBR+ID training, trained weights and simulation evaluation.
+- `sim_to_sim/`: PX4/Gazebo deployment, initialization and fixed-PID comparison experiments.
+- `render/`: Unity rendering resources.
+
 ## Quick Start
 
 ```bash
@@ -32,10 +40,10 @@ cd FlightLxx
 pip install -e .
 
 # Train a policy
-python3 Simulation_Experiments/train.py --model CTBR
+python3 train/train.py --model CTBR
 
 # Run experiments
-python3 Simulation_Experiments/run_experiment.py --trials 100 --seed 42
+python3 train/run_experiment.py --trials 100 --seed 42
 ```
 
-See `Simulation_Experiments/README.md` for detailed documentation.
+See `train/README.md` for detailed documentation.

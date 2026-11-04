@@ -60,7 +60,7 @@ def environment(run, spec, domain=120, gui=None):
                S2S_PX4_DIR=str(Path(os.environ.get("S2S_PX4_DIR", Path.home() / "PX4-Autopilot")).resolve()),
                S2S_HEADLESS="1", HEADLESS="1", S2S_TRIAL_DURATION="10", S2S_POLICY_PORT="5801",
                S2S_POLICY_PYTHON="/usr/bin/python3",
-               S2S_MODEL=str(ROOT.parent / "Simulation_Experiments/models" / (spec["model"] + ".zip")),
+               S2S_MODEL=str(ROOT.parent / "train/models" / (spec["model"] + ".zip")),
                S2S_ATTITUDE_ENCODING="principal_zyx", S2S_PID_PROFILE=spec["profile"],
                S2S_BATCH_DISCARD_SIMULATOR="1", S2S_TRAJECTORY_LEAD_S="0.35",
                ROS_DOMAIN_ID=str(domain), ROS_LOCALHOST_ONLY="1", GZ_IP="127.0.0.1",
