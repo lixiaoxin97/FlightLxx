@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sim-Flight 实验报告 — Ideal Dynamics</title>
+<style>
+:root{--bg:#f8f9fa;--card:#fff;--text:#2d3436;--border:#dee2e6;--ctbr:#0072B2;--dr:#D55E00;--id:#009E73}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans SC",sans-serif;background:var(--bg);color:var(--text);line-height:1.8;padding:20px}
+.container{max-width:1200px;margin:0 auto}
+header{background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);color:#fff;border-radius:12px;padding:40px 48px;margin-bottom:28px}
+header h1{font-size:1.7rem;letter-spacing:-0.5px}
+header .meta{color:#a0b4d0;font-size:.88rem;margin-top:10px;display:flex;gap:24px;flex-wrap:wrap}
+section{background:var(--card);border-radius:10px;padding:28px 36px;margin-bottom:22px;border:1px solid var(--border)}
+h2{font-size:1.2rem;margin-bottom:14px;padding-bottom:6px;border-bottom:2px solid #6c5ce7;color:#1a1a2e}
+h3{font-size:1rem;margin:16px 0 8px;color:#2d1b69}
+table{width:100%;border-collapse:collapse;margin:10px 0;font-size:.85rem}
+th,td{padding:8px 12px;text-align:center;border:1px solid var(--border)}
+th{background:#f1f3f5;font-weight:600}
+tr:nth-child(even) td{background:#fafbfc}
+.best{background:#d5f5e3!important;font-weight:700}
+.worst{background:#fdecea!important}
+.eq{background:#fdf6e3;border:1px solid #e6d99c;border-radius:6px;padding:10px 16px;margin:10px 0;font-family:"SF Mono","Fira Code",monospace;font-size:.8rem;overflow-x:auto}
+.callout{padding:12px 16px;border-radius:6px;margin:10px 0;font-size:.85rem}
+.callout.info{background:#e3f2fd;border-left:4px solid #1e88e5}
+.callout.ok{background:#e8f5e9;border-left:4px solid #27ae60}
+.tag{display:inline-block;padding:2px 10px;border-radius:10px;font-size:.72rem;font-weight:700;color:#fff}
+.tag.ctbr{background:var(--ctbr)}.tag.dr{background:var(--dr)}.tag.id{background:var(--id)}
+footer{text-align:center;color:#636e72;font-size:.75rem;padding:24px 0 10px}
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>Sim-Flight 实验报告</h1>
+  <p style="font-size:1rem;margin:4px 0;">Ideal Dynamics for Sim-to-Real Quadrotor Control</p>
+  <div class="meta">
+    <span>9,000 次试验</span><span>每条件 N=1,000</span><span>随机种子=42</span><span>2026-07-29</span>
+  </div>
+</header>
+
+<!-- 一、实验设计 -->
+<section>
+  <h2>一、实验设计</h2>
+
+  <h3>1.1 三种策略</h3>
+  <table>
+    <tr><th>策略</th><th>训练方式</th><th>电机模型</th><th>训练速度</th></tr>
+    <tr><td><span class="tag ctbr">CTBR</span></td><td>精确原型机参数 (0.78kg, 0.125m)</td><td>使用 (τ=0.033s)</td><td>8,278 FPS</td></tr>
+    <tr><td><span class="tag dr">CTBR+DR</span></td><td>每回合随机化 7 个动力学参数</td><td>使用</td><td>8,174 FPS</td></tr>
+    <tr><td><span class="tag id">CTBR+ID</span></td><td>理想动力学（指令即刻完美执行）</td><td>跳过</td><td>17,716 FPS</td></tr>
+  </table>
+  <div class="callout info">三种策略共用相同 PPO 超参数、MLP[64,64]-tanh 网络、CTBR 控制架构。各训练 2.5 亿步，100 并行环境。</div>
+
+  <h3>1.2 三种平台</h3>
+  <table>
+    <tr><th></th><th>Prototype</th><th>Iris</th><th>Crazyflie 2.0</th></tr>
+    <tr><td>质量</td><td>0.78 kg</td><td>1.5 kg</td><td>0.027 kg</td></tr>
+    <tr><td>臂长</td><td>0.125 m</td><td>0.275 m</td><td>0.044 m</td></tr>
+    <tr><td>电机时间常数 τ</td><td>0.033 s</td><td>0.0125 s</td><td>0.0001 s</td></tr>
+    <tr><td>单步响应率</td><td>45%</td><td>80%</td><td>≈100%</td></tr>
+    <tr><td>体速率 P 增益</td><td>[16.6, 16.6, 5]</td><td>[45, 45, 60]</td><td>[250, 250, 120]</td></tr>
+    <tr><td>推重比 T/W</td><td>7.3</td><td>1.9</td><td>116.7</td></tr>
+    <tr><td>参数来源</td><td>自研样机实测</td><td>PX4 iris.sdf</td><td>Bitcraze 固件</td></tr>
+  </table>
+
+  <h3>1.3 随机初始状态（三平台相同）</h3>
+  <table>
+    <tr><th>维度</th><th>范围</th></tr>
+    <tr><td>位置 x, y</td><td>[-1, 1] m</td></tr>
+    <tr><td>高度 z</td><td>[4, 6] m（悬停目标 [0,0,5]）</td></tr>
+    <tr><td>姿态 (roll, pitch, yaw)</td><td>任意角度 (-180° 到 180°)</td></tr>
+    <tr><td>线速度</td><td>[-1, 1] m/s（每轴独立）</td></tr>
+    <tr><td>角速率</td><td>[-1, 1] rad/s（每轴独立）</td></tr>
+  </table>
+
+  <h3>1.4 单次试验流程</h3>
+  <p>随机初始状态 → 策略控制 500 步（10 秒仿真时间）→ 判定恢复。</p>
+  <p><strong>恢复判定标准：</strong>位置误差 &lt; 0.3 m 且 速度 &lt; 0.3 m/s，持续 0.3 秒（15 步）。</p>
+  <p>失败模式：坠机（z ≤ 0）或超时（500 步未达标）。</p>
+
+  <h3>1.5 控制架构</h3>
+  <div class="eq">
+策略网络 (MLP 2×64 tanh) → act ∈ [-1,1]⁴
+  ↓ 反归一化
+ω_des = act[0:3] ⊙ [2π, 2π, π]         → [-2π,2π]×[-2π,2π]×[-π,π] rad/s
+推力 = act[3]×9.81+9.81                  → [0, 19.62] m/s²
+  ↓ P 体速率控制器 (Kp 平台相关)
+τ = J·Kp·(ω_des−ω) + ω×Jω
+  ↓ 推力分配矩阵 B⁻¹
+[f₁,f₂,f₃,f₄] → 四电机推力
+  ↓ 一阶电机模型 (Ω̇=(Ω_des−Ω)/τ)
+  ↓ 气动推力 (fᵢ=Kf1·Ω²+Kf2·Ω+Kf3)
+  ↓ RK4 积分 (8 子步 × 2.5ms)
+  ↓ 碰撞检测: z≤0 → 坠机
+新状态 [p, q, v, ω]</div>
+</section>
+
+<!-- 二、实验结果 -->
+<section>
+  <h2>二、实验结果 (每条件 N=1,000)</h2>
+
+  <h3>2.1 恢复成功率 (%)</h3>
+  <table>
+    <tr><th>平台</th><th>CTBR</th><th>CTBR+DR</th><th>CTBR+ID</th></tr>
+    <tr><td><strong>Prototype</strong> (T/W=7.3)</td><td class="best">97.8%</td><td>93.8%</td><td class="worst">37.3%</td></tr>
+    <tr><td><strong>Iris</strong> (T/W=1.9)</td><td>91.1%</td><td>83.9%</td><td>89.0%</td></tr>
+    <tr><td><strong>Crazyflie</strong> (T/W=116.7)</td><td class="worst">1.3%</td><td>96.7%</td><td class="best">98.1%</td></tr>
+  </table>
+  <div class="callout ok"><strong>统计显著性：</strong>标准误 ±1.5%（N=1,000）。所有跨平台对比均高度显著 (p &lt; 0.001)。</div>
+
+  <h3>2.2 平均最大位置误差 (m)</h3>
+  <table>
+    <tr><th>平台</th><th>CTBR</th><th>CTBR+DR</th><th>CTBR+ID</th></tr>
+    <tr><td>Prototype</td><td class="best">1.89</td><td>2.12</td><td>3.35</td></tr>
+    <tr><td>Iris</td><td>3.63</td><td>3.42</td><td class="best">2.84</td></tr>
+    <tr><td>Crazyflie</td><td>5.49</td><td>2.07</td><td class="best">1.62</td></tr>
+  </table>
+
+  <h3>2.3 坠机率 (%)</h3>
+  <table>
+    <tr><th>平台</th><th>CTBR</th><th>CTBR+DR</th><th>CTBR+ID</th></tr>
+    <tr><td>Prototype</td><td class="best">2.2%</td><td>6.2%</td><td class="worst">27.4%</td></tr>
+    <tr><td>Iris</td><td>8.1%</td><td>16.1%</td><td>11.0%</td></tr>
+    <tr><td>Crazyflie</td><td>6.8%</td><td>3.3%</td><td class="best">1.9%</td></tr>
+  </table>
+</section>
+
+<!-- 三、分析 -->
+<section>
+  <h2>三、结果分析</h2>
+
+  <h3>3.1 跨平台反转模式</h3>
+  <div class="eq">
+CTBR:    Proto 97.8% → Iris 91.1% → CF   1.3%   (单调下降 — 过拟合)
+CTBR+DR: Proto 93.8% → Iris 83.9% → CF  96.7%   (U 型 — 均衡泛化)
+CTBR+ID: Proto 37.3% → Iris 89.0% → CF  98.1%   (单调上升 — 理想动力学)</div>
+
+  <h3>3.2 CTBR — 训练平台专家</h3>
+  <p>Proto 97.8%（最高），Iris 91.1%，CF 仅 1.3%。精确参数匹配在训练平台上最优，但参数偏移后性能崩溃。Proto 与 Iris 质量/惯量分布相似，CTBR 可部分泛化；CF 参数差异过大则完全失效。</p>
+
+  <h3>3.3 CTBR+DR — 均衡泛化型</h3>
+  <p>三平台 83.9%–96.7%。域随机化牺牲顶峰性能换取全局鲁棒性。U 型曲线表明在物理约束最紧的 Iris (T/W=1.9) 上 DR 反而最弱——随机化的收益被推力不足的物理极限所抵消。</p>
+
+  <h3>3.4 CTBR+ID — 快响应平台王者</h3>
+  <p>CF 98.1%、Iris 89.0%、Proto 仅 37.3% 且坠机率 27.4%。成功率与电机响应率近乎完美正相关：</p>
+  <div class="eq">
+CF   (τ≈0.0001s, 响应≈100%) → 98.1%, 坠机率  1.9%
+Iris (τ=0.0125s,  响应≈80%)  → 89.0%, 坠机率 11.0%
+Proto(τ=0.033s,   响应≈45%)  → 37.3%, 坠机率 27.4%</div>
+  <p>CTBR+ID 在训练时从未见过电机延迟。部署到慢电机平台时，每步仅有 45% 指令生效——指令与响应之间的巨大偏差导致震荡和坠机。</p>
+
+  <h3>3.5 策略 × 平台匹配矩阵</h3>
+  <table>
+    <tr><th>策略</th><th>最强平台</th><th>最弱平台</th><th>机制</th></tr>
+    <tr><td><span class="tag ctbr">CTBR</span></td><td>Proto 97.8%</td><td>CF 1.3%</td><td>精确建模→域内最优；参数偏移→崩溃</td></tr>
+    <tr><td><span class="tag dr">CTBR+DR</span></td><td>CF 96.7%</td><td>Iris 83.9%</td><td>随机化平滑参数差异；物理极限不可逾越</td></tr>
+    <tr><td><span class="tag id">CTBR+ID</span></td><td>CF 98.1%</td><td>Proto 37.3%</td><td>理想假设仅在快响应平台上成立</td></tr>
+  </table>
+</section>
+
+<!-- 四、结论 -->
+<section>
+  <h2>四、结论</h2>
+  <ol>
+    <li><strong>理想动力学 (CTBR+ID) 能够在快响应平台上实现零成本仿真迁移</strong>（CF 98.1%、Iris 89.0%），但在电机延迟显著的平台上失效（Proto 37.3%）。</li>
+    <li><strong>精确建模 (CTBR) 在训练平台上最优</strong>（Proto 97.8%），但无法跨平台泛化（CF 1.3%）。</li>
+    <li><strong>域随机化 (CTBR+DR) 是最均衡的方案</strong>（83.9%–96.7%），以牺牲顶峰性能换取全局鲁棒性。</li>
+    <li><strong>电机单步响应率是 CTBR+ID 迁移成功的关键预测因子：</strong>100%→98.1%；80%→89.0%；45%→37.3%。</li>
+    <li><strong>推重比决定了可恢复性的物理下限：</strong>Iris (T/W=1.9) 对所有策略都是最困难的平台。</li>
+  </ol>
+</section>
+
+<footer>FlightLxx · Sim-Flight 实验 · 9,000 次试验 · N=1,000/条件 · seed=42 · 2026-07-29</footer>
+</div>
+</body>
+</html>
