@@ -9,7 +9,7 @@ MIT License.
 - `libs/`: C++ quadrotor dynamics, simulation environments and Python bindings.
 - `rl/`: PPO implementation, policies and vectorized environment wrappers.
 - `train/`: CTBR / CTBR+DR / CTBR+ID training, trained weights and simulation evaluation.
-- `sim_to_sim/`: PX4/Gazebo deployment, initialization and fixed-PID comparison experiments.
+- `sim_to_sim/`: PX4/Gazebo deployment, initialization and comparison experiments.
 - `render/`: Unity rendering resources.
 
 ## Quick Start
