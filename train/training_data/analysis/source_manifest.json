@@ -1,0 +1,60 @@
+{
+  "report_date": "2026-11-04",
+  "original_logs_sha256": {
+    "train/training_data/CTBR/progress.csv": "b968ef9716f117004ec8e8dafaf9e18bb8659df4932b48222438a4454930bbac",
+    "train/training_data/CTBR/log.txt": "af5a12c7c15646bef710de6807c25dd8c02162233cdda5d04bd5bcd79926494e",
+    "train/training_data/CTBR+DR/progress.csv": "33155423c3734f21f7fd1c006cc6b0b947b8a66b6b19993b5a9aaf656ea1e217",
+    "train/training_data/CTBR+DR/log.txt": "4425b660842d74da3270f17d3bf56cf8124a6b818e6c4eda3d9bed8ecd72b094",
+    "train/training_data/CTBR+ID/progress.csv": "567a504f699f6a862e016b69b011fc27240f5f999b6e9bf58fae2e9c5277068e",
+    "train/training_data/CTBR+ID/log.txt": "339e91c164413cce5ca38e369e01be591184e9b8df5220695592f6fe50b30e27"
+  },
+  "source_sha256": {
+    "train/train.py": "426254ed261f0f92ec4dc10ee47b7f4ea48a2c435256c74899f8779fd4fb3f43",
+    "rl/lxx_baselines/ppo/ppo2.py": "1b16be7be97a3a38b9d0ce6707d7976d2bcb48a83d0fe31a130dfe24b3d9eb74",
+    "rl/lxx_baselines/envs/vec_env_wrapper.py": "47a6e0e9c9d1c54c266ea70c2256c72949212d1582bf8c2094836280c7a8a3b8",
+    "libs/src/envs/rl_env.cpp": "c4ef0cffe78640ffa70a6a9768cb088a989781e2286464d39b2849db7bf5c501",
+    "libs/src/envs/vec_env.cpp": "1d80ff06bd065a132459737cb5a846685d190a5c492377d2a78a2eb2bce535e8",
+    "libs/src/objects/quadrotor.cpp": "f8903cbbfe92b26f468335019d64737750eb7dd60e36ae50614cf109c9690a00",
+    "libs/config/rl_env.yaml": "9a1f675bbf4ee280f905d54bbf5e684c2a28193d526a4134556b2a380dcb0f11",
+    "libs/config/vec_env.yaml": "191b22b6bb316f0303c113b76bba32b5ebff4b217e26e4767e4e351bc6ba5a67",
+    "rl/lxx_baselines/common/distributions.py": "07d1e46bf6d0002564e768ac2eca3c42a0009869b9cdaeb90ee6e3a40a506c24",
+    "train/training_data/analysis/build_report.py": "3481b5d20ed805274f3ab5ec61ad5f01d1250e1c2e2fba4a4480166973c39692"
+  },
+  "reference_model_sha256": {
+    "CTBR": "cda09b4b2d98766cc010e04597b93eb780445e357f4338c421b4e535ab37ca59",
+    "CTBR+DR": "5b23c9cf8c6b0f159fa5d120c7ce14b973174bb18f0bc238f8bed19cd2bfa33e",
+    "CTBR+ID": "76fd6f8e8a6c8991fbb305beaa512cb0e114c24d9cd7085186787d0a12bf151d"
+  },
+  "original_logs_unchanged": true,
+  "outputs_sha256": {
+    "TRAINING_COMPARISON_REPORT_2026-11-04.pdf": "dff73b7bbe187c54c94d719001170bd40d4c11937404701f1dbb3d68763642e6",
+    "TRAINING_COMPARISON_REPORT_2026-11-04.md": "eb5881c5213b9eb552fef6fd6d1fb397cb8b2e3266de866f6124edb5edb98c1c",
+    "analysis/analysis.json": "b46a43e19018f99044181c4d5438b6d88e56a9bfa589d6f1753883c515e13e5f",
+    "analysis/tables/summary.csv": "af42e67c54737470d28b920b353fe9f3890797a02f39308f438dc97933eb1125",
+    "analysis/tables/id_advantages.csv": "0ef3de6d5ff472212ee32e5fdb012e6b979ceb4760dee3fe472becb4e02452c0",
+    "analysis/tables/training_control_summary.csv": "9d550a8f18f56c244aaa561c76bf896e34bcbc6bf9af6b5db64df2a0420e0979",
+    "analysis/tables/window_sensitivity.csv": "a65ac9dd2c8cec69ef9f01902a19ce0719c74302128867bcb236d15107b8a04e",
+    "analysis/tables/tail500_metrics.csv": "89d9738da1773f28d44d4490aa82b2140a1e31cae93a648b39aba06849945509",
+    "analysis/tables/phases.csv": "778844d67124eab4b465e7eb7d5f3fe0f9a81b7fe63127932432d6379af55027",
+    "analysis/tables/tail500_blocks.csv": "2cc1dab05911a89c0d43f1e60c4954e3b8f64f4c3900af769b1f23d9453e2cdf",
+    "analysis/tables/training_control_id_gains.csv": "cd0047bdf9b29f19f7298f62228bd74809fbeadad533b17f1170e831e79c0794",
+    "analysis/tables/milestones.csv": "e247094f8187365132b23927cad4e57c822cabfcf6aab6e6ccaed1bf069ef2ee",
+    "analysis/tables/late_return_drops.csv": "89ee65fb6adac6194b645b62d79d2ef278234dc277d234217c12df1ac65f6d98",
+    "analysis/figures/04_ppo_diagnostics.png": "8032867ce611f18a2d499c18c840a549e100e3b162a49c21df9d3b1133285a62",
+    "analysis/figures/01_learning_curves.pdf": "23b003f2f91243b3df21b68f2206ecdd4fd66b9e9879d8f146a16cf12ff9e72d",
+    "analysis/figures/00_id_advantages.png": "cca975b75b0b5f52db71cbbe4ea1c968096c2c23d3aec3fecf374b74c23ff48d",
+    "analysis/figures/03_tail_quality.pdf": "e2afe422dd8767dc3445ca45bf4cb7cc378503e451d618a70126729c8c5960cc",
+    "analysis/figures/05_late_events.png": "282a4965d8f64195d234e398b2dcd2e8834ce1585898c7bc936c1fc60b15176d",
+    "analysis/figures/03_tail_quality.png": "fa56479b8642e9c862458fee323c394f89a33d89b8ff9bf6d209db017526df4c",
+    "analysis/figures/04_ppo_diagnostics.pdf": "f89561756529d30f1b239ee80c6f3915abfcda03e74a25a858b1510aea6b1e2b",
+    "analysis/figures/06_tail_and_entropy.pdf": "807955a8a5b72747097c5b52180735982ee26dc430395d718f5e2a4514e5813d",
+    "analysis/figures/06_tail_and_entropy.png": "98bf28fc778d3b5bf9ce8cf974df8e31f439f7e2dee0a98022d6927f6d673e06",
+    "analysis/figures/07_training_control.pdf": "eb9c58210d628b2f4ce3da7519b32f24d4885a86e1f1d86e2f1c1f048758eed1",
+    "analysis/figures/02_wall_time.pdf": "ea42fee79f75e76fb236112c688f53df786da425f404f68d5bca8f81df5b03ce",
+    "analysis/figures/07_training_control.png": "11bdda834859b30cb049639226e127b83c3e151a326178a1f41829df8b68ec2f",
+    "analysis/figures/02_wall_time.png": "c38ed4a028f786cbbe5371ea993b037359b4ebbc214512688e12e12578b6550b",
+    "analysis/figures/00_id_advantages.pdf": "727d1cc23e162bb60be44d435284ae57a7f9903eac78b063855c9d3a57f49ec4",
+    "analysis/figures/01_learning_curves.png": "91b7970df8edfe8f1e7a9e04e775c00fe1dc327b16a3dd046af9066b5ce447ee",
+    "analysis/figures/05_late_events.pdf": "07e36e9353d41141870ec7c5a4b775193609e46e5765cc068c6b4c8ae801548b"
+  }
+}

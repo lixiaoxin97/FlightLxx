@@ -70,6 +70,8 @@ def evaluate(times, positions, velocities, rates, actions=None, attitudes=None,
         tail_speed_max_m_s=max(speeds[i] for i in tail_indices) if coverage else None,
         whole_position_iae_m_s=sum(e*w for e,w in zip(errors,weights)),
         whole_position_rms_m=_rms(errors,weights))
+    result['whole_inside_position_speed_band_fraction'] = _mean([float(x) for x in inside],weights)
+    result['whole_outside_position_speed_band_fraction'] = _mean([float(not x) for x in inside],weights)
     if stable:
         last_bad=max((i for i,ok in enumerate(inside) if not ok),default=-1)
         entry=times[last_bad+1]

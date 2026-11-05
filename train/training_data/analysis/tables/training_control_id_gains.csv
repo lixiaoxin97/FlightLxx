@@ -1,0 +1,3 @@
+﻿baseline,mean_step_reward_gain,rollout_reward_std_reduction_pct,id_reward_p05_minus_baseline_p95
+CTBR,0.006962972249999991,68.1657459627334,0.002692300999999994
+CTBR+DR,0.00797116866,71.05742940188232,0.0023706282499999926

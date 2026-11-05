@@ -1,5 +1,8 @@
 # 固定 PID 的无人机初态对照实验
 
+本轮新增的五档2500次/网络实验、补做审计与同步视频制作见 [sim_experiment/README.md](sim_experiment/README.md)。数据与最终报告统一存于 `sim_experiment/five_level_2500_20261104/`，状态入口为该目录的 `START_HERE.md` 与 `delivery_status.json`。
+
+
 今后只需要更换初态列表，使用同一套 PID 对比 CTBR、CTBR+DR 和 CTBR+ID。统一入口为 `experiment.py`，下列命令均在 `~/Desktop/FlightLxx` 执行，使用系统 Python，无需预先 source ROS；启动器会为每场试验加载 ROS 环境。
 
 ```bash
